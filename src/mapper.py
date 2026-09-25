@@ -3,9 +3,10 @@ Repository discovery layer for the Onboarding Copilot pipeline.
 Owner: Maira (Mapper Agent)
 
 Accepts a local path (--path) or a remote git URL (--url), ensures the
-repo is on disk, then walks the tree and prints every non-ignored file
-path to stdout (one per line, repo-relative, forward-slash normalised).
-No classification, no LLM calls.
+repo is on disk, then walks the tree and emits a structured MapperOutput
+containing every non-ignored file path together with deterministic,
+zero-LLM classification results, import-based entry-point ranking, and a
+generated setup guide.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import argparse
 import ast
 import fnmatch as _fnmatch
 import os
+import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -330,10 +332,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def clone_repo(url: str) -> str:
     """Shallow-clone *url* into CLONE_DEST and return that path."""
     if os.path.exists(CLONE_DEST):
-        raise FileExistsError(
-            f"Clone destination already exists: '{CLONE_DEST}'. "
-            "Remove or rename it before cloning a new repository."
-        )
+        shutil.rmtree(CLONE_DEST)
     os.makedirs(os.path.dirname(CLONE_DEST), exist_ok=True)
     subprocess.run(["git", "clone", "--depth", "1", url, CLONE_DEST], check=True)
     return CLONE_DEST
@@ -371,6 +370,11 @@ def _build_module_index(files: list[str]) -> dict[str, str]:
     (the ``pkg`` key is emitted as the special package-root alias).
     """
     index: dict[str, str] = {}
+    # Known limitation: when two files share the same basename in different
+    # folders (e.g. src/utils.py and lib/utils.py), the shorter alias key
+    # (e.g. "utils") only resolves to whichever file os.walk encounters first.
+    # Any other file sharing that basename will not be reachable by its short
+    # name — only by its full dotted path (e.g. "lib.utils").
     for file in files:
         if not file.endswith(".py"):
             continue
