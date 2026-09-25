@@ -533,6 +533,8 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     # 7. Print as JSON.
+    # Save the output to disk for the Mentor Agent
+    mapper_output.to_json_file("mapper_output.json")
     print(mapper_output.model_dump_json(indent=2))
 
 
