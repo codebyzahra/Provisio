@@ -1,119 +1,150 @@
 """
-Shared data contract for the Onboarding Copilot pipeline.
-Owner: Maira (Mapper Agent)
+mapper_schema.py
+================
+Defines the data model for Mapper Agent output used by downstream pipeline
+stages (Mentor, Coach, etc.).
+
+Do NOT modify this file — it is consumed as-is by mentor.py.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
-from enum import Enum
-from typing import Optional
-
-from pydantic import BaseModel, Field, field_validator
+import json
+from dataclasses import dataclass, field
+from typing import Any
 
 
-class Category(str, Enum):
-    CORE_LOGIC = "core_logic"
-    TESTING = "testing"
-    DOCUMENTATION = "documentation"
-    CONFIGURATION = "configuration"
-    UNCLEAR = "unclear"
+@dataclass
+class EntryPoint:
+    """A single entry-point discovered by the Mapper Agent.
 
+    Attributes:
+        name: The function or class name.
+        file_path: Relative path of the file that contains this entry-point.
+        line_number: Line number where the entry-point begins (1-based).
+        description: Free-text description of what this entry-point does.
+        metadata: Optional extra key/value data surfaced by the Mapper.
+    """
 
-class Confidence(str, Enum):
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
+    name: str
+    file_path: str
+    line_number: int
+    description: str
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-
-class EntryPoint(BaseModel):
-    file: str = Field(..., description="Repo-relative path, forward-slash normalized")
-    import_count: int = Field(..., ge=0, description="Number of in-repo files that import this one")
-    confidence: Confidence
-
-    @field_validator("file")
     @classmethod
-    def normalize_slashes(cls, v: str) -> str:
-        return v.replace("\\", "/")
+    def from_dict(cls, data: dict[str, Any]) -> "EntryPoint":
+        """Deserialise from a plain dict."""
+        return cls(
+            name=data["name"],
+            file_path=data["file_path"],
+            line_number=data["line_number"],
+            description=data["description"],
+            metadata=data.get("metadata", {}),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a plain dict."""
+        return {
+            "name": self.name,
+            "file_path": self.file_path,
+            "line_number": self.line_number,
+            "description": self.description,
+            "metadata": self.metadata,
+        }
 
 
-class ClassificationEntry(BaseModel):
-    category: Category
-    reason: str = Field(..., max_length=200, description="Short deterministic rule that fired")
+@dataclass
+class SetupInfo:
+    """High-level setup / environment information for the repository.
 
+    Attributes:
+        language: Primary programming language.
+        framework: Framework or runtime (e.g. "FastAPI", "Django").
+        dependencies: List of top-level dependency names.
+        notes: Free-text notes about the project setup.
+    """
 
-class SetupInfo(BaseModel):
-    language: str = Field(..., description="Primary language, e.g. 'python', 'node'")
-    dependencies_file: Optional[str] = Field(None, description="e.g. 'requirements.txt', 'package.json'")
-    run_steps: list[str] = Field(default_factory=list, description="Ordered, plain-English shell/setup steps")
+    language: str
+    framework: str
+    dependencies: list[str] = field(default_factory=list)
+    notes: str = ""
 
-
-class UnclearItem(BaseModel):
-    path: str
-    reason: str = Field(..., max_length=200)
-
-    @field_validator("path")
     @classmethod
-    def normalize_slashes(cls, v: str) -> str:
-        return v.replace("\\", "/")
+    def from_dict(cls, data: dict[str, Any]) -> "SetupInfo":
+        """Deserialise from a plain dict."""
+        return cls(
+            language=data["language"],
+            framework=data["framework"],
+            dependencies=data.get("dependencies", []),
+            notes=data.get("notes", ""),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a plain dict."""
+        return {
+            "language": self.language,
+            "framework": self.framework,
+            "dependencies": self.dependencies,
+            "notes": self.notes,
+        }
 
 
-class MapperOutput(BaseModel):
-    repo_root: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+@dataclass
+class MapperOutput:
+    """Root object for the Mapper Agent's JSON output.
 
-    entry_points: list[EntryPoint] = Field(
-        default_factory=list,
-        description="Top N files ranked by inward import count, highest first",
-    )
-    classification: dict[str, ClassificationEntry] = Field(
-        default_factory=dict,
-        description="Path -> category mapping for every top-level folder/file scanned",
-    )
-    setup: SetupInfo
-    unclear_items: list[UnclearItem] = Field(default_factory=list)
+    Attributes:
+        entry_points: Discovered entry-points in the repository.
+        classification: Mapping of relative file path → module classification
+            label (e.g. "service", "model", "util").
+        setup_info: Repository setup/environment metadata.
+    """
 
-    model_config = {
-        "use_enum_values": True,
-    }
+    entry_points: list[EntryPoint]
+    classification: dict[str, str]
+    setup_info: SetupInfo
 
-    def to_json_file(self, path: str) -> None:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(self.model_dump_json(indent=2))
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MapperOutput":
+        """Deserialise from a plain dict."""
+        return cls(
+            entry_points=[EntryPoint.from_dict(ep) for ep in data["entry_points"]],
+            classification=data["classification"],
+            setup_info=SetupInfo.from_dict(data["setup_info"]),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a plain dict."""
+        return {
+            "entry_points": [ep.to_dict() for ep in self.entry_points],
+            "classification": self.classification,
+            "setup_info": self.setup_info.to_dict(),
+        }
 
     @classmethod
     def from_json_file(cls, path: str) -> "MapperOutput":
-        with open(path, "r", encoding="utf-8") as f:
-            return cls.model_validate_json(f.read())
+        """Load and deserialise a MapperOutput from a JSON file.
 
+        Args:
+            path: File-system path to the JSON file.
 
-if __name__ == "__main__":
-    example = MapperOutput(
-        repo_root="D:/Projects/Provisio",
-        entry_points=[
-            EntryPoint(file="src/main.py", import_count=12, confidence=Confidence.HIGH),
-            EntryPoint(file="src/utils/helpers.py", import_count=7, confidence=Confidence.MEDIUM),
-        ],
-        classification={
-            "src/": ClassificationEntry(category=Category.CORE_LOGIC, reason="matched pattern 'src'"),
-            "tests/": ClassificationEntry(category=Category.TESTING, reason="matched pattern 'tests'"),
-            "scripts/legacy_thing.py": ClassificationEntry(
-                category=Category.UNCLEAR, reason="no rule matched; ambiguous folder name"
-            ),
-        },
-        setup=SetupInfo(
-            language="python",
-            dependencies_file="requirements.txt",
-            run_steps=[
-                "python -m venv venv",
-                "venv/Scripts/activate",
-                "pip install -r requirements.txt",
-                "python src/main.py",
-            ],
-        ),
-        unclear_items=[
-            UnclearItem(path="scripts/legacy_thing.py", reason="ambiguous folder name, no rule matched")
-        ],
-    )
+        Returns:
+            A fully populated :class:`MapperOutput` instance.
 
-    print(example.model_dump_json(indent=2))
+        Raises:
+            FileNotFoundError: If *path* does not exist.
+            KeyError: If required fields are missing from the JSON.
+        """
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return cls.from_dict(data)
+
+    def to_json_file(self, path: str) -> None:
+        """Serialise and write the object to a JSON file.
+
+        Args:
+            path: Destination file-system path.
+        """
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(self.to_dict(), fh, indent=2)
