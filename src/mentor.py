@@ -555,7 +555,11 @@ def save_session(
         output_path: Destination path for the JSON file.  Defaults to
             ``"mentor_output.json"`` in the current working directory.
     """
-    output = MentorOutput(session=entries)
+    session_metadata = {
+        "total_questions": len(entries),
+        "saved_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    output = MentorOutput(entries=entries, session_metadata=session_metadata)
     output.to_json_file(output_path)
     print(f"[mentor] Session saved -> {output_path} ({len(entries)} entries)")
 
@@ -609,7 +613,7 @@ def run_session(
         print(f"\nMentor:\n{answer}\n")
 
         confidence = _prompt_confidence()
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
         entries.append(
             SessionEntry(
