@@ -196,7 +196,7 @@ def _chunk_mapper_output(mapper_output: MapperOutput) -> list[dict[str, Any]]:
 
     Produces:
     - One chunk per :class:`~mapper_schema.EntryPoint`.
-    - One chunk per entry in ``classification`` (batched as a single summary).
+    - One chunk summarising the ``classification`` map.
     - One chunk for :class:`~mapper_schema.SetupInfo`.
 
     Args:
@@ -209,21 +209,15 @@ def _chunk_mapper_output(mapper_output: MapperOutput) -> list[dict[str, Any]]:
 
     # --- Entry-point chunks -------------------------------------------------
     for ep in mapper_output.entry_points:
-        meta_str = (
-            "\n".join(f"  {k}: {v}" for k, v in ep.metadata.items())
-            if ep.metadata
-            else "  (none)"
-        )
         text = (
-            f"Entry-point: {ep.name}\n"
-            f"File: {ep.file_path}  (line {ep.line_number})\n"
-            f"Description: {ep.description}\n"
-            f"Metadata:\n{meta_str}"
+            f"Entry-point: {ep.file}\n"
+            f"Import count: {ep.import_count}\n"
+            f"Confidence: {ep.confidence}"
         )
         chunks.append(
             {
                 "text": text,
-                "source_path": ep.file_path,
+                "source_path": ep.file,
                 "source_type": "mapper_summary",
             }
         )
@@ -231,8 +225,8 @@ def _chunk_mapper_output(mapper_output: MapperOutput) -> list[dict[str, Any]]:
     # --- Classification chunk -----------------------------------------------
     if mapper_output.classification:
         lines = ["File classification map:"]
-        for file_path, label in mapper_output.classification.items():
-            lines.append(f"  {file_path}: {label}")
+        for file_path, entry in mapper_output.classification.items():
+            lines.append(f"  {file_path}: {entry.category} — {entry.reason}")
         chunks.append(
             {
                 "text": "\n".join(lines),
@@ -242,22 +236,22 @@ def _chunk_mapper_output(mapper_output: MapperOutput) -> list[dict[str, Any]]:
         )
 
     # --- Setup-info chunk ---------------------------------------------------
-    si = mapper_output.setup_info
-    deps_str = ", ".join(si.dependencies) if si.dependencies else "(none)"
-    text = (
-        f"Project setup:\n"
-        f"  Language: {si.language}\n"
-        f"  Framework: {si.framework}\n"
-        f"  Dependencies: {deps_str}\n"
-        f"  Notes: {si.notes}"
-    )
-    chunks.append(
-        {
-            "text": text,
-            "source_path": "mapper_output.json",
-            "source_type": "mapper_summary",
-        }
-    )
+    si = mapper_output.setup
+    if si:
+        run_steps_str = "\n".join(f"    - {s}" for s in si.run_steps) or "    (none)"
+        text = (
+            f"Project setup:\n"
+            f"  Language: {si.language}\n"
+            f"  Dependencies file: {si.dependencies_file or '(none)'}\n"
+            f"  Run steps:\n{run_steps_str}"
+        )
+        chunks.append(
+            {
+                "text": text,
+                "source_path": "mapper_output.json",
+                "source_type": "mapper_summary",
+            }
+        )
 
     return chunks
 
@@ -561,11 +555,7 @@ def save_session(
         output_path: Destination path for the JSON file.  Defaults to
             ``"mentor_output.json"`` in the current working directory.
     """
-    session_metadata: dict[str, Any] = {
-        "total_questions": len(entries),
-        "saved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    }
-    output = MentorOutput(entries=entries, session_metadata=session_metadata)
+    output = MentorOutput(session=entries)
     output.to_json_file(output_path)
     print(f"[mentor] Session saved -> {output_path} ({len(entries)} entries)")
 
@@ -619,7 +609,7 @@ def run_session(
         print(f"\nMentor:\n{answer}\n")
 
         confidence = _prompt_confidence()
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        timestamp = datetime.now(timezone.utc)
 
         entries.append(
             SessionEntry(

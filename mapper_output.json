@@ -1,0 +1,162 @@
+{
+  "repo_root": ".",
+  "generated_at": "2026-09-25T22:49:51.425072",
+  "entry_points": [
+    {
+      "file": "src/mapper_schema.py",
+      "import_count": 3,
+      "confidence": "medium"
+    },
+    {
+      "file": "src/mentor_schema.py",
+      "import_count": 2,
+      "confidence": "medium"
+    },
+    {
+      "file": "src/mentor.py",
+      "import_count": 1,
+      "confidence": "low"
+    },
+    {
+      "file": "src/mapper.py",
+      "import_count": 0,
+      "confidence": "low"
+    },
+    {
+      "file": "src/test_mentor.py",
+      "import_count": 0,
+      "confidence": "low"
+    }
+  ],
+  "classification": {
+    "mapper_output.json": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "requirements.txt": {
+      "category": "configuration",
+      "reason": "filename matches 'requirements.txt' → configuration"
+    },
+    ".pytest_cache/.gitignore": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    ".pytest_cache/CACHEDIR.TAG": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    ".pytest_cache/README.md": {
+      "category": "documentation",
+      "reason": "filename matches 'README*' → documentation"
+    },
+    ".pytest_cache/v/cache/nodeids": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "bob_sessions/bobs_builders_task01_cli_walker_summary.png": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "bob_sessions/bobs_builders_task02_ast_ranking_summary.png": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "bob_sessions/bobs_builders_task03_classifier_summary.png": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "bob_sessions/bobs_builders_task04_setup_guide_summary.png": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "bob_sessions/bobs_builders_task05_assembly_summary.png": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "bob_sessions/bobs_builders_task06_mapper_polish_summary.png": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "src/mapper.py": {
+      "category": "core_logic",
+      "reason": "folder 'src' → core_logic"
+    },
+    "src/mapper_schema.py": {
+      "category": "core_logic",
+      "reason": "folder 'src' → core_logic"
+    },
+    "src/mentor.py": {
+      "category": "core_logic",
+      "reason": "folder 'src' → core_logic"
+    },
+    "src/mentor_schema.py": {
+      "category": "core_logic",
+      "reason": "folder 'src' → core_logic"
+    },
+    "src/README.md": {
+      "category": "unclear",
+      "reason": "ambiguous: matched core_logic (folder) and documentation (filename)"
+    },
+    "src/test_mentor.py": {
+      "category": "unclear",
+      "reason": "ambiguous: matched core_logic (folder) and testing (filename)"
+    }
+  },
+  "setup": {
+    "language": "python",
+    "dependencies_file": "requirements.txt",
+    "run_steps": [
+      "pip install -r requirements.txt"
+    ]
+  },
+  "unclear_items": [
+    {
+      "path": "mapper_output.json",
+      "reason": "no rule matched"
+    },
+    {
+      "path": ".pytest_cache/.gitignore",
+      "reason": "no rule matched"
+    },
+    {
+      "path": ".pytest_cache/CACHEDIR.TAG",
+      "reason": "no rule matched"
+    },
+    {
+      "path": ".pytest_cache/v/cache/nodeids",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "bob_sessions/bobs_builders_task01_cli_walker_summary.png",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "bob_sessions/bobs_builders_task02_ast_ranking_summary.png",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "bob_sessions/bobs_builders_task03_classifier_summary.png",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "bob_sessions/bobs_builders_task04_setup_guide_summary.png",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "bob_sessions/bobs_builders_task05_assembly_summary.png",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "bob_sessions/bobs_builders_task06_mapper_polish_summary.png",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "src/README.md",
+      "reason": "ambiguous: matched core_logic (folder) and documentation (filename)"
+    },
+    {
+      "path": "src/test_mentor.py",
+      "reason": "ambiguous: matched core_logic (folder) and testing (filename)"
+    }
+  ]
+}
