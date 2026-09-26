@@ -37,6 +37,8 @@ import textwrap
 from datetime import datetime, timezone
 from typing import Any
 
+from llm_client import chat_completion
+
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
 from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped]
@@ -476,25 +478,37 @@ def _build_context_block(retrieved: list[dict[str, Any]]) -> str:
 def _generate_answer(question: str, context_block: str) -> str:
     """Generate a plain-text answer from *question* and *context_block*.
 
-    This implementation uses a **deterministic template-based synthesis**
-    rather than an LLM call, keeping the module dependency-free beyond
-    scikit-learn.  The context chunks are presented verbatim with headings;
-    a brief introductory sentence names the question being answered.
+    Calls the configured LLM (via :func:`~llm_client.chat_completion`) using
+    ``_SYSTEM_PROMPT`` as the system message and the question plus retrieved
+    context as the user message.
 
-    To integrate a real LLM (e.g. watsonx.ai or OpenAI), replace the body
-    of this function with an API call that passes ``_SYSTEM_PROMPT``,
-    ``context_block``, and ``question`` as the user message.
+    **Fallback behaviour:** if the LLM call raises any exception (network
+    error, rate-limit, authentication failure, etc.), the function degrades
+    gracefully by returning the original template-string synthesis — the same
+    format used before LLM integration — so the pipeline never crashes due to
+    a transient API problem.
 
     Args:
         question: The developer's original question.
         context_block: Formatted context retrieved by :func:`retrieve`.
 
     Returns:
-        A synthesised answer string.
+        An LLM-generated answer string, or a deterministic template-based
+        answer if the LLM call fails.
     """
-    intro = f'Answering: "{question}"\n\nRelevant context from the codebase:\n'
-    separator = "─" * 60
-    return f"{intro}{separator}\n{context_block}{separator}"
+    messages = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": f"Context:\n{context_block}\n\nQuestion: {question}",
+        },
+    ]
+    try:
+        return chat_completion(messages)
+    except Exception:  # noqa: BLE001
+        intro = f'Answering: "{question}"\n\nRelevant context from the codebase:\n'
+        separator = "─" * 60
+        return f"{intro}{separator}\n{context_block}{separator}"
 
 
 def ask(
