@@ -1,97 +1,141 @@
 """
-Shared data contract for the Mentor Agent output.
-Owner: Mentor Agent
+mentor_schema.py
+================
+Defines the data model for Mentor Agent session output, consumed by the
+Coach Agent in the Onboarding Copilot pipeline.
 
-This file defines the session log format that the Mentor Agent MUST produce.
-Any implementation of the Mentor Agent must serialise its output as a
-``MentorOutput`` object so that the Coach Agent can load it without modification.
-
-CONTRACT NOTICE
----------------
-Do **not** change the field names or types in this file without coordinating
-with the Coach Agent (coach.py / coach_schema.py).  Both agents share this
-schema as their integration boundary.
-
-REAL OUTPUT SHAPE (as produced by the real Mentor Agent)
----------------------------------------------------------
-- Top-level list field is ``entries``, not ``session``.
-- ``timestamp`` is a plain ISO-8601 string, not a datetime object.
-- ``session_metadata`` is an optional dict (not used by Coach).
-- Serialised with plain json.dump; Pydantic validates on load here.
+Do NOT modify this file — it is consumed as-is by mentor.py.
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional
+import json
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, Field
 
-from mapper_schema import Confidence
+class Confidence(str, Enum):
+    """Developer's self-reported confidence after reading the Mentor's answer.
+
+    Values:
+        HIGH: The developer feels fully confident about the topic.
+        MEDIUM: The developer has partial understanding; may need follow-up.
+        LOW: The developer is still unsure; further guidance recommended.
+    """
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 
 
-class SessionEntry(BaseModel):
-    """A single question-answer exchange recorded during a Mentor session.
+@dataclass
+class SessionEntry:
+    """A single Q&A exchange in a Mentor session.
 
     Attributes:
-        question:              The question the Mentor posed to the developer.
-        answer:                The developer's verbatim answer.
-        developer_confidence:  The developer's self-reported confidence level
-                               for this answer, using the shared
-                               :class:`~mapper_schema.Confidence` enum
-                               (``"high"`` / ``"medium"`` / ``"low"``).
-                               This field is intentionally named
-                               *developer_confidence* to distinguish it from
-                               the Mapper's ``EntryPoint.confidence`` field,
-                               which reflects *import-count importance*, not
-                               developer knowledge.
-        timestamp:             ISO-8601 timestamp string of when this exchange
-                               occurred (plain string, not a datetime object).
+        question: The question the developer asked.
+        answer: The Mentor's generated answer.
+        developer_confidence: The developer's self-reported confidence level.
+        timestamp: ISO-8601 UTC timestamp of the exchange.
     """
 
-    question: str = Field(..., description="Question posed by the Mentor")
-    answer: str = Field(..., description="Developer's verbatim answer")
-    developer_confidence: Confidence = Field(
-        ...,
-        description=(
-            "Developer's self-reported confidence: 'high', 'medium', or 'low'. "
-            "Must use the shared Confidence enum from mapper_schema."
-        ),
-    )
-    timestamp: str = Field(..., description="ISO-8601 timestamp string of the exchange")
+    question: str
+    answer: str
+    developer_confidence: Confidence
+    timestamp: str  # ISO-8601 UTC string, e.g. "2024-01-15T10:30:00"
 
-    model_config = {"use_enum_values": True}
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SessionEntry":
+        """Deserialise from a plain dict.
+
+        Args:
+            data: Dictionary with keys matching the dataclass fields.
+
+        Returns:
+            A :class:`SessionEntry` instance.
+        """
+        return cls(
+            question=data["question"],
+            answer=data["answer"],
+            developer_confidence=Confidence(data["developer_confidence"]),
+            timestamp=data["timestamp"],
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a plain dict suitable for JSON output.
+
+        Returns:
+            A dictionary representation of this entry.
+        """
+        return {
+            "question": self.question,
+            "answer": self.answer,
+            "developer_confidence": self.developer_confidence.value,
+            "timestamp": self.timestamp,
+        }
 
 
-class MentorOutput(BaseModel):
-    """The complete output of one Mentor session.
+@dataclass
+class MentorOutput:
+    """Root object for a complete Mentor Agent session.
 
-    A ``MentorOutput`` is a list of :class:`SessionEntry` objects, one per
-    question-answer exchange.  The Mentor Agent writes this to
-    ``mentor_output.json`` using plain json.dump; Coach loads it here via
-    :meth:`from_json_file`.
-
-    Field name is ``entries`` (not ``session``) — this matches the real
-    Mentor Agent output contract.
+    Attributes:
+        entries: Ordered list of Q&A exchanges from the session.
+        session_metadata: Optional key/value metadata (e.g. repo path, model).
     """
 
-    entries: list[SessionEntry] = Field(
-        default_factory=list,
-        description="Ordered list of question-answer exchanges from the session",
-    )
-    session_metadata: Optional[dict[str, Any]] = Field(
-        default=None,
-        description="Optional metadata dict produced by the Mentor Agent (not used by Coach)",
-    )
+    entries: list[SessionEntry] = field(default_factory=list)
+    session_metadata: dict[str, Any] = field(default_factory=dict)
 
-    model_config = {"use_enum_values": True}
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MentorOutput":
+        """Deserialise from a plain dict.
 
-    def to_json_file(self, path: str) -> None:
-        """Serialise this object to a JSON file at *path*."""
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(self.model_dump_json(indent=2))
+        Args:
+            data: Dictionary with ``entries`` list and optional metadata.
+
+        Returns:
+            A :class:`MentorOutput` instance.
+        """
+        return cls(
+            entries=[SessionEntry.from_dict(e) for e in data.get("entries", [])],
+            session_metadata=data.get("session_metadata", {}),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a plain dict.
+
+        Returns:
+            A dictionary with ``entries`` and ``session_metadata`` keys.
+        """
+        return {
+            "entries": [e.to_dict() for e in self.entries],
+            "session_metadata": self.session_metadata,
+        }
 
     @classmethod
     def from_json_file(cls, path: str) -> "MentorOutput":
-        """Deserialise a ``MentorOutput`` from a JSON file at *path*."""
+        """Load and deserialise a :class:`MentorOutput` from a JSON file.
+
+        Args:
+            path: File-system path to the JSON file.
+
+        Returns:
+            A fully populated :class:`MentorOutput` instance.
+
+        Raises:
+            FileNotFoundError: If *path* does not exist.
+        """
         with open(path, "r", encoding="utf-8") as fh:
-            return cls.model_validate_json(fh.read())
+            data = json.load(fh)
+        return cls.from_dict(data)
+
+    def to_json_file(self, path: str) -> None:
+        """Serialise and write the session to a JSON file.
+
+        Args:
+            path: Destination file-system path.
+        """
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(self.to_dict(), fh, indent=2)

@@ -1,0 +1,8 @@
+{
+  "generated_at": "2026-09-26T09:09:19.699039",
+  "repo_root": "",
+  "quiz": [],
+  "topic_scores": {},
+  "recommended_task": null,
+  "error": "Mapper output file not found: '..\\mapper_output.json'. Run mapper.py first."
+}

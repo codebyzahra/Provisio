@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import ast
 import fnmatch as _fnmatch
+import stat
 import os
 import shutil
 import subprocess
@@ -332,7 +333,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def clone_repo(url: str) -> str:
     """Shallow-clone *url* into CLONE_DEST and return that path."""
     if os.path.exists(CLONE_DEST):
-        shutil.rmtree(CLONE_DEST)
+        def _remove_readonly(func, path, excinfo):
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+
+        # Python 3.12+ uses onexc, older versions use onerror
+        try:
+            shutil.rmtree(CLONE_DEST, onexc=_remove_readonly)
+        except TypeError:
+            shutil.rmtree(CLONE_DEST, onerror=_remove_readonly)
+
     os.makedirs(os.path.dirname(CLONE_DEST), exist_ok=True)
     subprocess.run(["git", "clone", "--depth", "1", url, CLONE_DEST], check=True)
     return CLONE_DEST
