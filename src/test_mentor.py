@@ -9,16 +9,24 @@ Run from the repo root:
 Or from src/:
     python -m pytest test_mentor.py -v
 
-NO real LLM or neural-embedding calls are made anywhere in this file.
-mentor.py uses sklearn TF-IDF (local, CPU-only) and a deterministic template
-generator — both run entirely offline. Every test therefore costs $0 and can be
-re-run freely in the terminal.
+UPDATE (LLM integration): _generate_answer() now calls a live LLM (via Groq,
+through llm_client.chat_completion()) when available, falling back to the
+original deterministic string-template behavior if the LLM call fails or is
+unavailable (e.g. no LLM_API_KEY set, network error). Tests in this file that
+exercise ask() may therefore hit either path depending on environment and
+network availability. All other components — the TF-IDF vectoriser, chunking,
+and retrieval — remain 100% local, offline, and unchanged.
 
 Mocking notes
 -------------
 - TF-IDF vectoriser  → NOT mocked. It is a local sklearn operation; instant.
-- Answer generator   → NOT mocked. _generate_answer() is a string-template
-                       function (no LLM); deterministic by design.
+- Answer generator   → NOT mocked. _generate_answer() may call a live LLM via
+                       llm_client.chat_completion() if LLM_API_KEY is set and
+                       reachable; otherwise it falls back to the original
+                       deterministic string-template behavior. Tests assert on
+                       grounding/fallback behavior (e.g. the exact
+                       INSUFFICIENT_INFO_RESPONSE string), which holds under
+                       either path, rather than asserting on exact answer text.
 - File I/O           → Uses tempfile.TemporaryDirectory / NamedTemporaryFile;
                        no permanent files are written to the repo.
 - mapper_output.json → A synthetic MINIMAL_MAPPER_JSON fixture (3 entry_points,
@@ -339,8 +347,9 @@ class TestChunkMapperOutput(unittest.TestCase):
 class TestBuildKnowledgeBase(unittest.TestCase):
     """build_knowledge_base() — end-to-end ingestion + TF-IDF vectorisation.
 
-    No LLM or neural embeddings involved — this is pure sklearn TF-IDF.
-    Tests run offline, instantly, at zero cost.
+    No LLM or neural embeddings involved — this stage (chunking + TF-IDF
+    vectorisation) is unchanged by the LLM integration and remains pure
+    sklearn TF-IDF. Tests run offline, instantly, at zero cost.
     """
 
     def setUp(self):
@@ -457,8 +466,14 @@ class TestRetrieve(unittest.TestCase):
 class TestAsk(unittest.TestCase):
     """ask() — RAG answer generation.
 
-    No LLM is called.  _generate_answer() is a deterministic string-template
-    function inside mentor.py, so every test runs offline at zero cost.
+    _generate_answer() now calls a live LLM (via Groq, through
+    llm_client.chat_completion()) when LLM_API_KEY is set and the call
+    succeeds, falling back to the original deterministic string-template
+    behavior if the LLM call fails or is unavailable. These tests assert on
+    grounding/fallback behavior — the exact INSUFFICIENT_INFO_RESPONSE
+    string, and the presence of known KB tokens in a grounded answer — both
+    of which hold true regardless of which generation path is taken. Tests
+    do NOT assert on exact answer wording, since that varies with the LLM.
     """
 
     def setUp(self):
@@ -509,7 +524,12 @@ class TestAsk(unittest.TestCase):
     # --- unanswerable questions ---------------------------------------------
 
     def test_unanswerable_question_returns_exact_fallback(self):
-        """A question with zero KB overlap must return the exact fallback string."""
+        """A question with zero KB overlap must return the exact fallback string.
+
+        This check happens in ask() BEFORE any LLM call is made (the
+        RELEVANCE_THRESHOLD gate short-circuits generation entirely), so this
+        assertion holds regardless of LLM availability.
+        """
         # Uses tokens guaranteed to be absent from the fixture KB
         answer = ask(
             "xyzzy frobnicate the quantum blockchain microservice",
