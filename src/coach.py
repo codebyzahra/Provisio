@@ -74,7 +74,7 @@ def generate_quiz(session: list[SessionEntry], n: int = 3) -> list[QuizItem]:
     for entry in selected:
         topic = _extract_topic(entry.question)
         quiz_question = _rephrase_as_quiz_question(entry.question, entry.answer)
-        keywords = _extract_keywords(entry.answer)
+        keywords = _extract_keywords(entry.answer, topic=topic)
         items.append(
             QuizItem(
                 topic=topic,
@@ -143,6 +143,47 @@ def _extract_topic(question: str) -> str:
     return clean[:60].strip()
 
 
+def _extract_answer_body(answer: str) -> str:
+    """Return only the prose content lines from a Mentor answer string.
+
+    When the Mentor runs without a real LLM its answers are structured RAG
+    blocks that begin with an ``Answering: "…"`` header line, followed by
+    separator lines (``────…``), chunk-metadata lines
+    (``[n] (source: …, relevance: …)``), and the raw chunk texts.
+    This helper strips all of those wrapper lines, leaving only the
+    human-readable content sentences suitable for hint extraction and keyword
+    scoring.  Plain prose answers (from the sample fixture or a real LLM) pass
+    through unchanged.
+
+    Args:
+        answer: Raw answer string as stored in a :class:`~mentor_schema.SessionEntry`.
+
+    Returns:
+        The prose portion of *answer*, with leading/trailing whitespace removed.
+        Returns *answer* as-is if no RAG wrapper markers are detected.
+    """
+    import re
+
+    # Patterns that identify RAG-wrapper lines to drop:
+    #   • "Answering: …" header
+    #   • "Relevant context from the codebase:" sub-header
+    #   • Separator lines made of box-drawing or dash characters
+    #   • Chunk-metadata lines: "[1] (source: …, relevance: …)"
+    _NOISE_LINE = re.compile(
+        r'^(?:'
+        r'Answering\s*:'           # RAG intro header
+        r'|Relevant context'       # context sub-header
+        r'|[─\-─━]{10,}'           # separator line (10+ dashes / box-drawing chars)
+        r'|\[\d+\]\s*\(source:'    # chunk metadata: [1] (source: …)
+        r')',
+        re.IGNORECASE,
+    )
+
+    lines = answer.splitlines()
+    body_lines = [ln for ln in lines if ln.strip() and not _NOISE_LINE.match(ln.strip())]
+    return " ".join(body_lines).strip() or answer.strip()
+
+
 def _rephrase_as_quiz_question(question: str, answer: str) -> str:
     """Construct a targeted quiz question from the original Mentor Q&A pair.
 
@@ -157,41 +198,96 @@ def _rephrase_as_quiz_question(question: str, answer: str) -> str:
         A quiz question string.
     """
     topic = _extract_topic(question)
-    # Use the first sentence of the answer as a hint anchor if it is short.
-    first_sentence = answer.split(".")[0].strip()
-    hint = f" (hint: think about \"{first_sentence}\")" if len(first_sentence) < 80 else ""
+    # Strip RAG wrapper lines before pulling the hint sentence.
+    body = _extract_answer_body(answer)
+    # Use the first complete sentence of the clean body as a hint, only when
+    # it is short enough to be readable and does not itself contain a quote
+    # character (which would break the surrounding f-string template).
+    first_sentence = body.split(".")[0].strip()
+    first_sentence = first_sentence.replace('"', '').replace("'", "")
+    hint = f" — hint: {first_sentence}" if 8 < len(first_sentence) < 80 else ""
     return f"In your own words, explain {topic}{hint}."
 
 
-def _extract_keywords(text: str) -> list[str]:
-    """Extract meaningful keywords from *text* for answer scoring.
+def _extract_keywords(
+    text: str,
+    max_keywords: int = 7,
+    topic: str = "",
+) -> list[str]:
+    """Extract 5–8 meaningful concept keywords from *text* for answer scoring.
 
-    Filters out common English stop words and short tokens, returning
-    lower-cased unique tokens that represent the core concepts.
+    Only pure alphabetic words (optionally hyphenated) are considered —
+    code fragments, numeric tokens, table characters, and other non-alphabetic
+    noise are discarded before scoring.
+
+    Scoring strategy
+    ~~~~~~~~~~~~~~~~
+    1. Strip RAG wrapper lines (header, separators, chunk-metadata) so that
+       only prose content contributes to the term frequency count.
+    2. Compute raw term frequency over the clean prose.
+    3. Apply a **3× topic-affinity boost** to any word that also appears in
+       *topic* (the question's subject phrase).  This ensures domain-specific
+       concept words mentioned in the question rise above generic meta-words
+       like "source", "relevance", or "chunks" that are repeated throughout
+       every RAG block regardless of the topic.
+    4. Sort by boosted score descending; cap at *max_keywords*.
 
     Args:
-        text: Free-form text (typically a Mentor answer).
+        text:         Free-form text (typically a Mentor answer or RAG chunk).
+        max_keywords: Hard upper limit on returned keywords (default 7).
+        topic:        Optional topic/question phrase; words present here get a
+                      score boost so they are preferred over retrieval meta-words.
 
     Returns:
-        A deduplicated list of lowercase keyword strings.
+        A deduplicated list of up to *max_keywords* lowercase keyword strings,
+        ordered from most to least relevant to the topic.
     """
+    import re
+
     _STOP_WORDS: frozenset[str] = frozenset({
         "a", "an", "the", "is", "it", "in", "on", "of", "to", "and", "or",
         "for", "with", "that", "this", "are", "be", "by", "at", "as", "so",
         "we", "you", "can", "has", "have", "had", "not", "but", "its",
         "which", "was", "were", "they", "them", "their", "from", "will",
-        "when", "what", "how", "does", "do", "if", "any", "all",
+        "when", "what", "how", "does", "do", "if", "any", "all", "also",
+        "each", "both", "into", "more", "then", "than", "such", "about",
+        "used", "uses", "use", "one", "two", "per",
     })
-    tokens = text.lower().split()
-    seen: set[str] = set()
-    keywords: list[str] = []
-    for token in tokens:
-        # Strip punctuation from both ends.
-        clean = token.strip(".,;:!?\"'()")
-        if len(clean) > 3 and clean not in _STOP_WORDS and clean not in seen:
-            seen.add(clean)
-            keywords.append(clean)
-    return keywords
+
+    # Accept only tokens that are purely alphabetic or hyphenated-alpha
+    # (e.g. "entry-point", "self-reported").  This rejects code tokens,
+    # numeric values, table pipes, markdown backtick fragments, etc.
+    _WORD_RE = re.compile(r'^[a-z]+(?:-[a-z]+)*$')
+
+    def _tokenise(src: str) -> list[str]:
+        result = []
+        for raw in src.lower().split():
+            tok = raw.strip(".,;:!?\"'()*`|_#[]\\/>")
+            if _WORD_RE.match(tok) and len(tok) >= 4 and tok not in _STOP_WORDS:
+                result.append(tok)
+        return result
+
+    # Score over the clean prose body only (strips RAG wrapper lines).
+    body = _extract_answer_body(text)
+    freq: dict[str, int] = {}
+    for tok in _tokenise(body):
+        freq[tok] = freq.get(tok, 0) + 1
+
+    # Build a set of words present in the topic phrase for affinity boosting.
+    topic_words: set[str] = set(_tokenise(topic)) if topic else set()
+
+    # Boosted score: topic-present words are worth 3× their raw frequency.
+    _TOPIC_BOOST = 3
+
+    def _score(item: tuple[str, int]) -> tuple[float, str]:
+        word, count = item
+        multiplier = _TOPIC_BOOST if word in topic_words else 1
+        return (-count * multiplier, word)  # negative for descending sort
+
+    ranked = sorted(freq.items(), key=_score)
+
+    # Return the top N terms, capped at max_keywords.
+    return [word for word, _ in ranked[:max_keywords]]
 
 
 # ---------------------------------------------------------------------------
