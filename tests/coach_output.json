@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-09-26T09:37:44.407370",
+  "repo_root": "C:\\Users\\Utente\\Provisio",
+  "quiz": [
+    {
+      "topic": "what does the developer_confidence field represent, and how",
+      "question": "In your own words, explain what does the developer_confidence field represent, and how.",
+      "expected_keywords": [
+        "field",
+        "developer",
+        "answer",
+        "based",
+        "certain",
+        "confidence",
+        "count"
+      ],
+      "developer_answer": "The Mapper Agent scans the repo and ranks files by import count to find entry points.",
+      "verdict": "needs_review"
+    },
+    {
+      "topic": "the mentor agent determine which topics to cover in a sessio",
+      "question": "In your own words, explain the mentor agent determine which topics to cover in a sessio.",
+      "expected_keywords": [
+        "agent",
+        "mentor",
+        "around",
+        "central",
+        "classification",
+        "codebase",
+        "concepts"
+      ],
+      "developer_answer": "The Mentor picks files from entry_points and classification to ask the developer questions.",
+      "verdict": "needs_review"
+    },
+    {
+      "topic": "the role of the mapper agent in this pipeline",
+      "question": "In your own words, explain the role of the mapper agent in this pipeline.",
+      "expected_keywords": [
+        "agent",
+        "mapper",
+        "agents",
+        "categories",
+        "classifies",
+        "consume",
+        "count"
+      ],
+      "developer_answer": "developer_confidence is self-reported knowledge; mapper confidence is based on import data.",
+      "verdict": "needs_review"
+    }
+  ],
+  "topic_scores": {
+    "what does the developer_confidence field represent, and how": "needs_review",
+    "the mentor agent determine which topics to cover in a sessio": "needs_review",
+    "the role of the mapper agent in this pipeline": "needs_review"
+  },
+  "recommended_task": {
+    "file": "src/coach.py",
+    "reason": "Start with `src/coach.py` — it is the most-imported Category.CORE_LOGIC file in the repository (matched pattern 'src'), making it the best entry point for a new contributor."
+  },
+  "error": ""
+}

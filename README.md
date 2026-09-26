@@ -1,252 +1,161 @@
-# Coach Agent
+# PROVISIO — Onboarding Copilot
 
-**Owner:** Zahra · **Branch:** `zahra-coach`  
-**Pipeline position:** Mapper → Mentor → **Coach**
-
----
-
-## What It Does
-
-The Coach Agent is the third and final stage of the Onboarding Copilot pipeline.
-It takes the structured outputs of the Mapper Agent and the Mentor Agent, runs a
-targeted 3-question quiz to test what the developer actually learned, scores their
-answers, and recommends exactly one real starter task from the repository that
-matches their demonstrated understanding.
-
-The full session result is written to `coach_output.json` and printed to stdout
-as a single JSON object, ready to be consumed by an orchestrator without extra
-parsing.
-
-### Steps performed
-
-1. **Load inputs** — reads `mapper_output.json` (Mapper Agent) and
-   `mentor_output.json` (Mentor Agent).
-2. **Generate quiz** — produces 3 questions derived from the topics covered in
-   the session log, prioritising topics where the developer reported lower
-   confidence.
-3. **Score answers** — keyword-overlap scoring classifies each topic as
-   `"understood"` or `"needs_review"`.
-4. **Recommend a task** — picks one file from `entry_points` (the Mapper's
-   import-ranked list) whose classification matches what the developer understood.
-5. **Write output** — saves `coach_output.json` and prints to stdout.
+> **Built for the IBM Bob 2.0 Hackathon** using Bob IDE's Agent mode.
 
 ---
 
-## Files
+## What it does
 
-| File | Role |
-|---|---|
-| `src/coach.py` | Main implementation and CLI entry point |
-| `src/coach_schema.py` | Pydantic output models (`CoachOutput`, `QuizItem`, `TaskRecommendation`) |
-| `src/mentor_schema.py` | Pydantic contract for Mentor Agent output (`MentorOutput`, `SessionEntry`) |
-| `src/mapper_schema.py` | Shared upstream contract (Mapper Agent — do not modify) |
+New developers waste days reading unfamiliar codebases before they can contribute anything useful.
+Most onboarding tools respond to this by *explaining* the code.
+PROVISIO goes one step further: it **explains the code, then verifies that the developer actually understood it** before recommending real work.
+The result is a structured three-stage pipeline that turns a raw repository path into a quiz score and a matched starter task — no hallucinated context, no generic tutorials, no sending someone to read a file they aren't ready for.
 
 ---
 
-## Input Format
+## Architecture
 
-The Coach Agent reads two JSON files.
+```
+          repo path
+              │
+              ▼
+       ┌─────────────┐
+       │   Mapper    │  ← analyzes repo structure, ranks files by import
+       │  (src/mapper.py)   count, classifies each file, detects setup steps
+       └──────┬──────┘
+              │  mapper_output.json
+              ▼
+       ┌─────────────┐
+       │   Mentor    │  ← RAG-based Q&A grounded exclusively in the codebase;
+       │ (src/mentor.py)    chunks source files + mapper analysis, retrieves
+       │             │    relevant context via TF-IDF + cosine similarity,
+       │             │    records each exchange + developer confidence level
+       └──────┬──────┘
+              │  mentor_output.json
+              ▼
+       ┌─────────────┐
+       │    Coach    │  ← quizzes the developer on what was covered, scores
+       │ (src/coach.py)     each answer, and recommends exactly one real
+       │             │    starter task matched to their demonstrated knowledge
+       └─────────────┘
+              │
+              ▼
+       coach_output.json
+```
 
-### `mapper_output.json` — produced by the Mapper Agent
+| Stage | Responsibility | Owner |
+|---|---|---|
+| **Mapper** | Parses the repo, ranks files by import count, classifies every file (`core_logic`, `testing`, …), and generates a setup guide | Maira |
+| **Mentor** | Answers natural-language questions about the codebase using lightweight RAG (TF-IDF + cosine similarity, no vector DB required) and logs the full Q&A session with confidence ratings | Zahra M |
+| **Coach** | Generates a targeted quiz from the session log, scores answers by keyword overlap, and recommends a starter task from the Mapper's ranked entry-point list | Zahra |
+
+---
+
+## Why this is different
+
+Most onboarding tools stop at *explaining* code.
+
+PROVISIO **proves the developer understood it** before pointing them at real work.
+The quiz is generated from the developer's own session — not a generic test — and the recommended task is selected from the repository's actual entry points, matched to the topics the developer scored well on.
+A developer who cannot pass the quiz gets told which topics to revisit, not a random ticket.
+
+---
+
+## Setup
+
+**Requirements:** Python ≥ 3.9
+
+```bash
+pip install -r requirements.txt
+```
+
+`requirements.txt` currently contains:
+
+```
+pydantic
+scikit-learn
+numpy
+```
+
+> `scikit-learn` and `numpy` are required by the Mentor Agent's TF-IDF vectoriser.
+> `pydantic` is used by the Mapper and Coach schemas.
+
+---
+
+## Running the pipeline
+
+Run each agent in order, passing the output of one stage as input to the next.
+
+```bash
+# Stage 1 — Mapper: analyze the target repository
+python src/mapper.py /path/to/target/repo
+
+# Stage 2 — Mentor: interactive Q&A session
+python src/mentor.py mapper_output.json /path/to/target/repo
+# Type your questions; type `exit` or `quit` to save mentor_output.json
+
+# Stage 3 — Coach: quiz, score, and recommend a task
+python src/coach.py \
+    --mapper-output mapper_output.json \
+    --mentor-output  mentor_output.json \
+    --answers        answers.json        # optional: pre-supplied developer answers
+```
+
+All three stages can also be imported as Python modules and wired together in an orchestrator script using the schemas in `mapper_schema.py`, `mentor_schema.py`, and `coach_schema.py`.
+
+---
+
+## Example
+
+**Input:** the PROVISIO repository itself (`repo_path = "."`)
+
+After the Mapper and a short Mentor session, the Coach produces `coach_output.json`:
 
 ```json
 {
-  "repo_root": "/path/to/repo",
-  "generated_at": "2024-01-15T10:00:00",
-  "entry_points": [
-    { "file": "src/main.py",          "import_count": 12, "confidence": "high"   },
-    { "file": "src/utils/helpers.py", "import_count":  7, "confidence": "medium" }
-  ],
-  "classification": {
-    "src/main.py":          { "category": "core_logic",  "reason": "root file 'main.py' → core_logic" },
-    "src/utils/helpers.py": { "category": "core_logic",  "reason": "folder 'src' → core_logic"        },
-    "tests/test_main.py":   { "category": "testing",     "reason": "filename matches 'test_*.py'"     }
-  },
-  "setup": {
-    "language": "python",
-    "dependencies_file": "requirements.txt",
-    "run_steps": ["pip install -r requirements.txt", "python src/main.py"]
-  },
-  "unclear_items": []
-}
-```
-
-### `mentor_output.json` — produced by the Mentor Agent
-
-> **Mentor implementors:** your agent MUST write this exact schema.
-> Load/save via `MentorOutput.from_json_file()` / `to_json_file()`.
-
-```json
-{
-  "session": [
-    {
-      "question":              "What is the role of the entry-point ranking in the Mapper?",
-      "answer":                "The Mapper ranks Python files by how many other files import them, so the most central files surface first for new contributors.",
-      "developer_confidence":  "high",
-      "timestamp":             "2024-01-15T10:05:00"
-    },
-    {
-      "question":              "How does the Mapper classify a file as core_logic?",
-      "answer":                "Files inside a 'src' folder or named 'main.py' at the root are classified as core_logic using folder and filename pattern rules.",
-      "developer_confidence":  "medium",
-      "timestamp":             "2024-01-15T10:07:00"
-    },
-    {
-      "question":              "What does the setup guide detect?",
-      "answer":                "It looks for requirements.txt, package.json, or a Dockerfile at the repo root and generates ordered run steps.",
-      "developer_confidence":  "low",
-      "timestamp":             "2024-01-15T10:09:00"
-    }
-  ]
-}
-```
-
-### `answers.json` — developer's quiz answers (optional)
-
-A plain JSON array of strings, one per quiz question in order:
-
-```json
-[
-  "The Mapper ranks files by import count so the most central modules appear first.",
-  "main.py at the root or any file inside src/ is classified as core_logic.",
-  "It checks for requirements.txt and generates pip install steps."
-]
-```
-
-Omit this file (or pass no `--answers` flag) to score all questions as
-`"needs_review"`.
-
----
-
-## Output Format
-
-Written to `coach_output.json` and printed to stdout.
-
-```json
-{
-  "generated_at": "2024-01-15T10:12:00",
-  "repo_root": "/path/to/repo",
+  "generated_at": "2026-09-26T09:33:48",
+  "repo_root": ".",
   "quiz": [
     {
-      "topic":              "setup guide detect",
-      "question":           "In your own words, explain setup guide detect (hint: think about \"It looks for requirements.txt\").",
-      "expected_keywords":  ["requirements.txt", "package.json", "dockerfile", "repo", "root", "generates", "ordered", "steps"],
-      "developer_answer":   "It checks for requirements.txt and generates pip install steps.",
-      "verdict":            "understood"
-    },
-    {
-      "topic":              "mapper classify file core_logic",
-      "question":           "In your own words, explain mapper classify file core_logic (hint: think about \"Files inside a 'src' folder\").",
-      "expected_keywords":  ["files", "inside", "folder", "named", "root", "classified", "core_logic", "folder", "filename", "pattern", "rules"],
-      "developer_answer":   "main.py at the root or any file inside src/ is classified as core_logic.",
-      "verdict":            "understood"
-    },
-    {
-      "topic":              "role entry-point ranking mapper",
-      "question":           "In your own words, explain role entry-point ranking mapper (hint: think about \"The Mapper ranks Python files\").",
-      "expected_keywords":  ["mapper", "ranks", "python", "files", "other", "files", "import", "them", "most", "central", "files", "surface", "first", "contributors"],
-      "developer_answer":   "The Mapper ranks files by import count so the most central modules appear first.",
-      "verdict":            "understood"
+      "topic": "the entry points in mapper.py",
+      "question": "In your own words, explain the entry points in mapper.py — hint: Entry-point: src/mapper.",
+      "expected_keywords": ["entry", "chunks", "files", "chunk", "mentor", "output", "path"],
+      "developer_answer": "Files are ranked by how many other modules import them.",
+      "verdict": "understood"
     }
   ],
   "topic_scores": {
-    "setup guide detect":             "understood",
-    "mapper classify file core_logic": "understood",
-    "role entry-point ranking mapper": "understood"
+    "the entry points in mapper.py": "understood"
   },
   "recommended_task": {
-    "file":   "src/main.py",
-    "reason": "Start with `src/main.py` — it is a core_logic file (root file 'main.py' → core_logic) and your quiz results show you already understand \"setup guide detect\", \"mapper classify file core_logic\", which maps directly to this file's responsibilities."
+    "file": "src/mapper_schema.py",
+    "reason": "Start with `src/mapper_schema.py` — it is the most-imported core_logic file in the repository, making it the best entry point for a new contributor."
   },
   "error": ""
 }
 ```
 
-### Error response (when session log is empty or inputs cannot be loaded)
-
-```json
-{
-  "generated_at": "2024-01-15T10:12:00",
-  "repo_root":    "",
-  "quiz":         [],
-  "topic_scores": {},
-  "recommended_task": null,
-  "error": "Session log is empty — the Mentor Agent produced no question-answer entries.  Run the Mentor Agent first."
-}
-```
+The developer gets a concrete next step — a specific file, with a reason — instead of "read the docs".
 
 ---
 
-## Usage
+## Per-agent documentation
 
-### CLI
+Each agent has its own detailed README covering its internal architecture, input/output schemas, edge cases, and extension points:
 
-```bash
-# All defaults (reads mapper_output.json and mentor_output.json in cwd)
-python src/coach.py --mapper-output mapper_output.json \
-                    --mentor-output  mentor_output.json \
-                    --answers        answers.json
-
-# Custom output path
-python src/coach.py --mapper-output mapper_output.json \
-                    --mentor-output  mentor_output.json \
-                    --answers        answers.json \
-                    --output         results/coach_output.json
-
-# No answers provided — all topics scored as needs_review
-python src/coach.py --mapper-output mapper_output.json \
-                    --mentor-output  mentor_output.json
-```
-
-### Python / Orchestrator
-
-```python
-from mapper_schema import MapperOutput
-from mentor_schema import MentorOutput
-from coach import run_coach_session
-
-mapper_output = MapperOutput.from_json_file("mapper_output.json")
-mentor_output = MentorOutput.from_json_file("mentor_output.json")
-answers = ["answer 1", "answer 2", "answer 3"]
-
-output = run_coach_session(mapper_output, mentor_output, answers)
-output.to_json_file("coach_output.json")
-print(output.model_dump_json(indent=2))
-```
+| Agent | Owner | Detailed README |
+|---|---|---|
+| Mapper | **Maira** | *(see `src/mapper.py` inline docstrings)* |
+| Mentor | **Zahra M** | [`src/README.md`](src/README.md) |
+| Coach | **Zahra** | [`README.md` (root, pre-replacement)](README.md) — see `git log` for the original |
 
 ---
 
-## Edge Cases
+## Project info
 
-| Condition | Behaviour |
+| | |
 |---|---|
-| Empty session log | Returns `CoachOutput` with `error` set; no crash |
-| Fewer than 3 session entries | Quiz has fewer than 3 questions; scoring still works |
-| Missing `answers.json` | All questions scored `"needs_review"`; warning printed to stderr |
-| `answers.json` shorter than quiz | Unanswered questions scored `"needs_review"` |
-| No `entry_points` in Mapper output | `recommended_task` is `null`; no crash |
-| Missing Mapper/Mentor file | `error` field set with helpful message; exits with code 1 |
-
----
-
-## Pipeline Integration
-
-```
-mapper.py ──► mapper_output.json ──┐
-                                    ├──► coach.py ──► coach_output.json
-mentor.py ──► mentor_output.json ──┘
-```
-
-The Coach Agent consumes both upstream outputs without modification.  No field
-renames or adapter layers are needed as long as both upstream agents write the
-schemas defined in `mapper_schema.py` and `mentor_schema.py`.
-
----
-
-## Dependencies
-
-```
-pydantic
-```
-
-Same single dependency as the rest of the pipeline (see `requirements.txt`).
+| **Event** | IBM Bob 2.0 Hackathon |
+| **Tooling** | Bob IDE — Agent mode |
+| **Language** | Python 3.9+ |
+| **External services** | None — fully offline, no LLM API calls required |

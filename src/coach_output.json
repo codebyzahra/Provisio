@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-09-26T09:33:48.090532",
+  "repo_root": ".",
+  "quiz": [
+    {
+      "topic": "the entry points in mapper.py",
+      "question": "In your own words, explain the entry points in mapper.py — hint: Entry-point: src/mapper.",
+      "expected_keywords": [
+        "entry",
+        "chunks",
+        "files",
+        "chunk",
+        "mentor",
+        "output",
+        "path"
+      ],
+      "developer_answer": "",
+      "verdict": "needs_review"
+    }
+  ],
+  "topic_scores": {
+    "the entry points in mapper.py": "needs_review"
+  },
+  "recommended_task": {
+    "file": "src/mapper_schema.py",
+    "reason": "Start with `src/mapper_schema.py` — it is the most-imported Category.CORE_LOGIC file in the repository (folder 'src' → core_logic), making it the best entry point for a new contributor."
+  },
+  "error": ""
+}
