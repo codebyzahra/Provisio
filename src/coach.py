@@ -521,7 +521,7 @@ def _build_reason(
                 cls_entry = val
                 break
 
-    category_label = cls_entry.category if cls_entry else "key"
+    category_label = cls_entry.category.value if cls_entry else "key"
     mapper_reason = cls_entry.reason if cls_entry else "it is a highly imported file"
 
     if understood_topics:

@@ -494,7 +494,7 @@ def rank_by_imports(
 # Sub-Task 4 — main() wiring
 # ---------------------------------------------------------------------------
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> "MapperOutput":
     args = parse_args(argv)
 
     # 1. Resolve root path (clone if URL).
@@ -546,6 +546,7 @@ def main(argv: list[str] | None = None) -> None:
     # Save the output to disk for the Mentor Agent
     mapper_output.to_json_file("mapper_output.json")
     print(mapper_output.model_dump_json(indent=2))
+    return mapper_output
 
 
 if __name__ == "__main__":
