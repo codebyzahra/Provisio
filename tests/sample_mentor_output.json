@@ -1,22 +1,26 @@
 {
-  "session": [
+  "entries": [
     {
       "question": "What is the role of the Mapper Agent in this pipeline?",
       "answer": "The Mapper Agent scans the repository, ranks files by their inward import count to identify entry points, classifies folders into categories like core_logic or testing, and produces a structured MapperOutput that downstream agents consume.",
       "developer_confidence": "high",
-      "timestamp": "2024-11-15T09:05:12Z"
+      "timestamp": "2024-11-15T09:05:12"
     },
     {
       "question": "How does the Mentor Agent determine which topics to cover in a session?",
       "answer": "The Mentor Agent uses the Mapper's entry_points list and classification map to pick files central to the codebase, then formulates questions around each file's purpose, encouraging the developer to explain concepts in their own words.",
       "developer_confidence": "medium",
-      "timestamp": "2024-11-15T09:18:44Z"
+      "timestamp": "2024-11-15T09:18:44"
     },
     {
       "question": "What does the developer_confidence field represent, and how does it differ from the Mapper's confidence field?",
       "answer": "developer_confidence reflects how certain the developer feels about their own answer during the Mentor session, using high, medium, or low. The Mapper's confidence field instead measures how reliably an entry point was identified based on import count data, not developer knowledge.",
       "developer_confidence": "low",
-      "timestamp": "2024-11-15T09:31:07Z"
+      "timestamp": "2024-11-15T09:31:07"
     }
-  ]
+  ],
+  "session_metadata": {
+    "total_questions": 3,
+    "saved_at": "2024-11-15T09:35:00+00:00"
+  }
 }

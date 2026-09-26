@@ -11,11 +11,18 @@ CONTRACT NOTICE
 Do **not** change the field names or types in this file without coordinating
 with the Coach Agent (coach.py / coach_schema.py).  Both agents share this
 schema as their integration boundary.
+
+REAL OUTPUT SHAPE (as produced by the real Mentor Agent)
+---------------------------------------------------------
+- Top-level list field is ``entries``, not ``session``.
+- ``timestamp`` is a plain ISO-8601 string, not a datetime object.
+- ``session_metadata`` is an optional dict (not used by Coach).
+- Serialised with plain json.dump; Pydantic validates on load here.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -37,7 +44,8 @@ class SessionEntry(BaseModel):
                                the Mapper's ``EntryPoint.confidence`` field,
                                which reflects *import-count importance*, not
                                developer knowledge.
-        timestamp:             UTC timestamp of when this exchange occurred.
+        timestamp:             ISO-8601 timestamp string of when this exchange
+                               occurred (plain string, not a datetime object).
     """
 
     question: str = Field(..., description="Question posed by the Mentor")
@@ -49,7 +57,7 @@ class SessionEntry(BaseModel):
             "Must use the shared Confidence enum from mapper_schema."
         ),
     )
-    timestamp: datetime = Field(..., description="UTC timestamp of the exchange")
+    timestamp: str = Field(..., description="ISO-8601 timestamp string of the exchange")
 
     model_config = {"use_enum_values": True}
 
@@ -58,14 +66,21 @@ class MentorOutput(BaseModel):
     """The complete output of one Mentor session.
 
     A ``MentorOutput`` is a list of :class:`SessionEntry` objects, one per
-    question-answer exchange.  The Mentor Agent must write this to
-    ``mentor_output.json`` using :meth:`to_json_file` so the Coach Agent can
-    consume it with :meth:`from_json_file`.
+    question-answer exchange.  The Mentor Agent writes this to
+    ``mentor_output.json`` using plain json.dump; Coach loads it here via
+    :meth:`from_json_file`.
+
+    Field name is ``entries`` (not ``session``) — this matches the real
+    Mentor Agent output contract.
     """
 
-    session: list[SessionEntry] = Field(
+    entries: list[SessionEntry] = Field(
         default_factory=list,
         description="Ordered list of question-answer exchanges from the session",
+    )
+    session_metadata: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Optional metadata dict produced by the Mentor Agent (not used by Coach)",
     )
 
     model_config = {"use_enum_values": True}

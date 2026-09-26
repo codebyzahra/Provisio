@@ -480,7 +480,7 @@ def run_coach_session(
         set and all other meaningful fields are empty/None.
     """
     # --- Guard: empty session log ---------------------------------------- #
-    if not mentor_output.session:
+    if not mentor_output.entries:
         return CoachOutput(
             repo_root=mapper_output.repo_root,
             error=(
@@ -490,7 +490,7 @@ def run_coach_session(
         )
 
     # --- Step 1: generate quiz ------------------------------------------- #
-    quiz = generate_quiz(mentor_output.session, n=3)
+    quiz = generate_quiz(mentor_output.entries, n=3)
 
     # --- Step 2: score answers ------------------------------------------- #
     scored_quiz = score_quiz(quiz, answers)

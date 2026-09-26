@@ -163,7 +163,7 @@ def test_empty_session_log() -> bool:
     """Passing an empty MentorOutput must return an error JSON, not crash."""
     _print_section("TEST 2 — Empty Session Log (edge case)")
 
-    empty_mentor = MentorOutput(session=[])
+    empty_mentor = MentorOutput(entries=[])
     mapper_output = _build_synthetic_mapper()
 
     output = run_coach_session(mapper_output, empty_mentor, answers=[])
