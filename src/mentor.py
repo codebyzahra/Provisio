@@ -38,8 +38,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
+from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped]
 
 from mapper_schema import MapperOutput
 from mentor_schema import Confidence, MentorOutput, SessionEntry
@@ -111,9 +111,11 @@ def _fixed_chunks(
 def _python_chunks(text: str, source_path: str) -> list[dict[str, Any]]:
     """Parse a Python source file and emit one chunk per top-level definition.
 
-    Each function and class (including methods) becomes its own chunk,
-    preserving its docstring and body. The leading module-level code
-    (imports, constants, etc.) is collected as a single preamble chunk.
+    Emits one chunk for each top-level function/class and for each method
+    directly inside a top-level class. Nested functions and nested classes are
+    not emitted as separate chunks — they remain part of their enclosing
+    definition's chunk. The leading module-level code (imports, constants,
+    etc.) is collected as a single preamble chunk.
 
     Falls back to :func:`_fixed_chunks` if the file cannot be parsed.
 
@@ -133,25 +135,31 @@ def _python_chunks(text: str, source_path: str) -> list[dict[str, Any]]:
     chunks: list[dict[str, Any]] = []
     covered_lines: set[int] = set()  # 0-based line indices
 
-    # One chunk per top-level function / class
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            # Only emit top-level and class-level definitions (depth ≤ 1)
-            start_line = node.lineno - 1  # convert to 0-based
-            end_line = node.end_lineno     # inclusive, 1-based → exclusive 0-based
+    def _emit(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> None:
+        start_line = node.lineno - 1  # convert to 0-based
+        end_line = node.end_lineno if node.end_lineno is not None else node.lineno  # inclusive 1-based → exclusive 0-based
+        node_src = "".join(lines[start_line:end_line]).strip()
+        if node_src:
+            name = node.name
+            chunks.append(
+                {
+                    "text": f"# {source_path} — {name}\n{node_src}",
+                    "source_path": source_path,
+                    "source_type": "code",
+                }
+            )
+        for i in range(start_line, end_line):
+            covered_lines.add(i)
 
-            node_src = "".join(lines[start_line:end_line]).strip()
-            if node_src:
-                name = getattr(node, "name", "<anonymous>")
-                chunks.append(
-                    {
-                        "text": f"# {source_path} — {name}\n{node_src}",
-                        "source_path": source_path,
-                        "source_type": "code",
-                    }
-                )
-            for i in range(start_line, end_line):
-                covered_lines.add(i)
+    # One chunk per top-level function/class; for classes, also one chunk per
+    # direct child method — no deeper recursion.
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            _emit(node)
+            if isinstance(node, ast.ClassDef):
+                for child in ast.iter_child_nodes(node):
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        _emit(child)
 
     # Preamble: lines not covered by any function/class
     preamble_lines = [
@@ -332,7 +340,7 @@ def build_knowledge_base(
 
     # Attach dense vectors to each chunk (convert sparse row → 1-D ndarray)
     for idx, chunk in enumerate(chunks):
-        chunk["vector"] = np.asarray(tfidf_matrix[idx].todense()).flatten()
+        chunk["vector"] = np.asarray(tfidf_matrix[idx].todense()).flatten()  # type: ignore[union-attr]
 
     # Store the fitted vectorizer in a special sentinel chunk for later use
     # (avoids passing it as a separate argument through the public API).
@@ -411,7 +419,7 @@ def retrieve(
         return []
 
     q_vec = vectorizer.transform([question])  # sparse (1 × n_terms)
-    q_dense = np.asarray(q_vec.todense()).flatten()
+    q_dense = np.asarray(q_vec.todense()).flatten()  # type: ignore[union-attr]
 
     # Stack all chunk vectors into a matrix for batch cosine similarity
     chunk_matrix = np.vstack([c["vector"] for c in content])  # (n × n_terms)

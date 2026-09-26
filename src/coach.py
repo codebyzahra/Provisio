@@ -113,7 +113,7 @@ def _select_entries(session: list[SessionEntry], n: int) -> list[SessionEntry]:
 
     sorted_by_confidence = sorted(
         session,
-        key=lambda e: _confidence_rank.get(e.developer_confidence, 1),
+        key=lambda e: _confidence_rank.get(e.developer_confidence, 1),  # type: ignore[arg-type]
     )
     return sorted_by_confidence[:n]
 
