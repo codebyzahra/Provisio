@@ -207,6 +207,39 @@ def _run_coach(
 
 
 # ---------------------------------------------------------------------------
+# Programmatic entry point (used by app.py)
+# ---------------------------------------------------------------------------
+
+
+def run_pipeline(target: str, output_dir: str = ".") -> None:
+    """Run the full Mapper → Mentor → Coach pipeline from Python.
+
+    This is the callable entry point for the Streamlit dashboard.  It mirrors
+    what ``main()`` does via the CLI but accepts plain strings rather than an
+    ``argparse.Namespace``, so callers do not need to touch ``sys.argv``.
+
+    Args:
+        target: A local repository path or a remote git URL.
+        output_dir: Directory where JSON output files will be written.
+                    Defaults to the current working directory.
+
+    Raises:
+        SystemExit: Propagated from ``_fail()`` on any stage error so the
+                    caller can catch it and inspect ``exc.code`` / stderr.
+    """
+    is_url = target.startswith(("http://", "https://", "git@", "git://"))
+    args = argparse.Namespace(
+        path=None if is_url else target,
+        url=target if is_url else None,
+        output_dir=output_dir,
+    )
+
+    mapper_output = _run_mapper(args, output_dir)
+    mentor_output = _run_mentor(mapper_output, output_dir)
+    _run_coach(mapper_output, mentor_output, output_dir)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 

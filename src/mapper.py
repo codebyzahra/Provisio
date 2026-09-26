@@ -344,7 +344,24 @@ def clone_repo(url: str) -> str:
             shutil.rmtree(CLONE_DEST, onerror=_remove_readonly)
 
     os.makedirs(os.path.dirname(CLONE_DEST), exist_ok=True)
-    subprocess.run(["git", "clone", "--depth", "1", url, CLONE_DEST], check=True)
+
+    # Use CREATE_NO_WINDOW on Windows to prevent the console-spawn that causes
+    # git.exe to be killed by antivirus/UAC (exit code 0xC000013A / 3221225786).
+    extra: dict = {}
+    if sys.platform == "win32":
+        extra["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    result = subprocess.run(
+        ["git", "clone", "--depth", "1", url, CLONE_DEST],
+        capture_output=True,
+        text=True,
+        **extra,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"git clone failed (exit {result.returncode}):\n"
+            f"{result.stderr.strip() or result.stdout.strip()}"
+        )
     return CLONE_DEST
 
 

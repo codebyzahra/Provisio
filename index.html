@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Provisio — Developer Onboarding Copilot</title>
+
+  <!-- Inline SVG favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjODE4Y2Y4Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjYTc4YmZhIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2MwODRmYyIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHBvbHlnb24gcG9pbnRzPSIxNiwyICAyMCwxMyAxMywxMyAxNywxNiAxMCwyOCAyMiwxNCAxNSwxNCAyMiwyIiBmaWxsPSJ1cmwoI2cpIi8+Cjwvc3ZnPg==" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            base: '#050505',
+          },
+          animation: {
+            'spin-slow': 'spin 2s linear infinite',
+            'pulse-glow': 'pulseGlow 3s ease-in-out infinite',
+            'fade-up': 'fadeUp 0.5s ease forwards',
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { opacity: '0.4' },
+              '50%':       { opacity: '0.75' },
+            },
+            fadeUp: {
+              from: { opacity: '0', transform: 'translateY(16px)' },
+              to:   { opacity: '1', transform: 'translateY(0)' },
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      background-color: #050505;
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+
+    /* ── Ambient drifting blobs ── */
+    .ambient-blob {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(120px);
+      will-change: transform;
+      z-index: 0;
+    }
+    .ambient-blob-1 {
+      width: 700px; height: 700px;
+      top: -180px; left: -200px;
+      background: rgba(99, 102, 241, 0.18);
+      animation: blobDrift1 18s ease-in-out infinite;
+    }
+    .ambient-blob-2 {
+      width: 600px; height: 600px;
+      bottom: -150px; right: -180px;
+      background: rgba(139, 92, 246, 0.17);
+      animation: blobDrift2 22s ease-in-out infinite;
+    }
+    .ambient-blob-3 {
+      width: 500px; height: 500px;
+      top: 45%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(192, 132, 252, 0.12);
+      animation: blobDrift3 26s ease-in-out infinite;
+    }
+    @keyframes blobDrift1 {
+      0%   { transform: translate(0,  0)   rotate(0deg)   scale(1);    }
+      33%  { transform: translate(60px, 80px)  rotate(60deg)  scale(1.08); }
+      66%  { transform: translate(-40px, 50px) rotate(120deg) scale(0.95); }
+      100% { transform: translate(0,  0)   rotate(0deg)   scale(1);    }
+    }
+    @keyframes blobDrift2 {
+      0%   { transform: translate(0,  0)    rotate(0deg)   scale(1);    }
+      33%  { transform: translate(-70px, -60px) rotate(-50deg) scale(1.1);  }
+      66%  { transform: translate(50px, -80px)  rotate(-110deg) scale(0.93); }
+      100% { transform: translate(0,  0)    rotate(0deg)   scale(1);    }
+    }
+    @keyframes blobDrift3 {
+      0%   { transform: translate(-50%, -50%) rotate(0deg)   scale(1);    }
+      50%  { transform: translate(-50%, -50%) rotate(180deg) scale(1.12); }
+      100% { transform: translate(-50%, -50%) rotate(360deg) scale(1);    }
+    }
+
+    /* ── Hero entrance animation ── */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+    .hero-animate {
+      opacity: 0;
+      animation: fadeInUp 0.65s ease forwards;
+    }
+
+    /* Animated radial glow — top centre */
+    .bg-glow::before {
+      content: '';
+      position: fixed;
+      top: -160px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 860px;
+      height: 560px;
+      background: radial-gradient(ellipse at center, rgba(99,102,241,0.22) 0%, rgba(168,85,247,0.14) 40%, transparent 70%);
+      pointer-events: none;
+      animation: pulseGlow 4s ease-in-out infinite;
+      z-index: 1;
+    }
+
+    @keyframes pulseGlow {
+      0%,100% { opacity: .45; }
+      50%      { opacity: .85; }
+    }
+
+    /* Spinner ring */
+    .ring {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      border-top-color: #818cf8;
+      border-right-color: #a78bfa;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Glass card */
+    .glass {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+    }
+
+    /* Gradient text */
+    .grad-text {
+      background: linear-gradient(135deg, #818cf8 0%, #a78bfa 50%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Glowing button */
+    .btn-glow {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      box-shadow: 0 0 24px rgba(99,102,241,0.45), 0 0 48px rgba(139,92,246,0.2);
+      transition: box-shadow 0.3s, transform 0.3s;
+    }
+    .btn-glow:hover {
+      box-shadow: 0 0 44px rgba(99,102,241,0.85), 0 0 80px rgba(139,92,246,0.5);
+      transform: translateY(-1px) scale(1.05);
+    }
+    .btn-glow:active { transform: translateY(0) scale(1); }
+
+    /* Secondary button */
+    .btn-ghost {
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    }
+    .btn-ghost:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.18);
+      transform: translateY(-1px);
+    }
+
+    /* Input */
+    .input-glass {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: #f8fafc !important;
+      caret-color: #f8fafc;
+      -webkit-text-fill-color: #f8fafc;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    .input-glass::placeholder { color: rgba(226,232,240,0.3); -webkit-text-fill-color: rgba(226,232,240,0.3); }
+    .input-glass:focus {
+      border-color: rgba(129,140,248,0.6);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+
+    /* Confidence badge */
+    .badge-high   { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+    .badge-medium { background: rgba(251,191,36,0.12);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+    .badge-low    { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+
+    /* Verdict badge */
+    .badge-pass   { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+    .badge-review { background: rgba(251,191,36,0.12);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+    .badge-fail   { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+
+    /* Section fade-up on render */
+    .animate-fade-up { animation: fadeUp 0.45s ease forwards; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+    .hidden { display: none !important; }
+
+    /* ── Hero radial glow (behind headline) ── */
+    .hero-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -58%);
+      width: 700px;
+      height: 420px;
+      background: radial-gradient(ellipse at center,
+        rgba(88, 28, 220, 0.28) 0%,
+        rgba(109, 40, 217, 0.18) 30%,
+        rgba(139, 92, 246, 0.08) 60%,
+        transparent 80%);
+      filter: blur(48px);
+      pointer-events: none;
+      z-index: 2;
+      animation: pulseGlow 5s ease-in-out infinite;
+    }
+
+    /* ── Feature pills glassmorphic row ── */
+    .pill-row {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(129, 140, 248, 0.15);
+      border-radius: 9999px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 6px 10px;
+      display: inline-flex;
+      gap: 4px;
+      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.06) inset,
+                  0 4px 24px rgba(99, 102, 241, 0.08);
+    }
+    .pill-row .pill-item {
+      background: rgba(129, 140, 248, 0.09);
+      border: 1px solid rgba(129, 140, 248, 0.18);
+      border-radius: 9999px;
+      padding: 5px 14px;
+      font-size: 0.8125rem;
+      color: #c4b5fd;
+      font-weight: 500;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+  </style>
+</head>
+
+<body class="bg-glow">
+
+  <!-- Constellation canvas -->
+  <canvas id="bg-canvas" class="fixed top-0 left-0 w-full h-full pointer-events-none" style="z-index:0;" aria-hidden="true"></canvas>
+
+  <!-- Ambient background blobs -->
+  <div class="ambient-blob ambient-blob-1" aria-hidden="true"></div>
+  <div class="ambient-blob ambient-blob-2" aria-hidden="true"></div>
+  <div class="ambient-blob ambient-blob-3" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       VIEW 1 — LANDING
+  ════════════════════════════════════════════════════════════ -->
+  <div id="landing-view" class="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
+
+    <!-- Hero radial glow — sits between bg canvas and foreground text -->
+    <div class="hero-glow" aria-hidden="true"></div>
+
+    <!-- Wordmark -->
+    <div class="mb-10 flex items-center gap-2.5 hero-animate" style="animation-delay:0s">
+      <div class="w-8 h-8 rounded-lg btn-glow flex items-center justify-center shrink-0">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 2h10a1 1 0 011 1v3a1 1 0 01-1 1H9l-1 2H6l-1-2H3a1 1 0 01-1-1V3a1 1 0 011-1z" fill="white" opacity="0.9"/>
+          <circle cx="8" cy="12" r="2" fill="white" opacity="0.6"/>
+        </svg>
+      </div>
+      <span class="text-white font-semibold tracking-tight text-lg">Provisio</span>
+    </div>
+
+    <!-- Hero heading -->
+    <h1 class="text-5xl sm:text-6xl md:text-7xl font-extrabold leading-tight tracking-tight mb-6 max-w-4xl hero-animate" style="animation-delay:0.1s">
+      <span class="text-white">Your Developer</span><br/>
+      <span class="grad-text">Onboarding Copilot</span>
+    </h1>
+
+    <p class="text-slate-400 text-lg sm:text-xl max-w-xl mb-10 leading-relaxed font-light hero-animate" style="animation-delay:0.2s">
+      Point Provisio at any GitHub repository and receive an instant, AI-generated onboarding guide — architecture map, mentor Q&amp;A, and knowledge quiz included.
+    </p>
+
+    <!-- Feature pills -->
+    <div class="flex flex-wrap gap-3 justify-center mb-12 hero-animate" style="animation-delay:0.32s">
+      <div class="pill-row">
+        <span class="pill-item">⚡ Architecture Analysis</span>
+        <span class="pill-item">🧠 AI Mentor Q&amp;A</span>
+        <span class="pill-item">🎯 Knowledge Quiz</span>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button id="start-btn" class="btn-glow text-white font-semibold px-10 py-4 rounded-xl text-base cursor-pointer hero-animate" style="animation-delay:0.46s">
+      Start Trial &nbsp;→
+    </button>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════
+       VIEW 2 — INPUT & LOADING
+  ════════════════════════════════════════════════════════════ -->
+  <div id="input-view" class="hidden relative z-10 flex flex-col items-center justify-center min-h-screen px-6">
+
+    <!-- Back -->
+    <button id="back-btn" class="absolute top-8 left-8 btn-ghost text-slate-400 text-sm font-medium px-4 py-2 rounded-lg cursor-pointer">
+      ← Back
+    </button>
+
+    <!-- Card -->
+    <div class="glass p-10 w-full max-w-lg animate-fade-up">
+
+      <div class="mb-8 text-center">
+        <h2 class="text-2xl font-bold text-white mb-2">Analyze a Repository</h2>
+        <p class="text-slate-400 text-sm">Paste a public GitHub URL to generate an instant onboarding guide.</p>
+      </div>
+
+      <!-- Input form -->
+      <div id="form-section">
+        <label class="block text-slate-400 text-xs font-medium uppercase tracking-widest mb-2">GitHub Repository URL</label>
+        <input
+          id="repo-url"
+          type="text"
+          class="input-glass w-full px-5 py-4 text-base mb-5"
+          placeholder="https://github.com/username/repository"
+          autocomplete="off"
+          spellcheck="false"
+        />
+
+        <!-- Error -->
+        <p id="input-error" class="hidden text-red-400 text-xs mb-4 font-medium"></p>
+
+        <button id="analyze-btn" class="btn-glow w-full text-white font-semibold py-4 rounded-xl text-sm cursor-pointer">
+          Generate Guide
+        </button>
+      </div>
+
+      <!-- Loading state (hidden initially) -->
+      <div id="loading-section" class="hidden flex-col items-center text-center py-4">
+        <div class="ring mx-auto mb-6"></div>
+        <p class="text-white font-semibold text-base mb-1">Analyzing repository architecture…</p>
+        <p class="text-slate-500 text-sm">This can take a minute. Hang tight.</p>
+        <div class="mt-6 flex gap-1.5 justify-center">
+          <span id="stage-dot-1" class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          <span id="stage-dot-2" class="w-2 h-2 rounded-full bg-white/10"></span>
+          <span id="stage-dot-3" class="w-2 h-2 rounded-full bg-white/10"></span>
+        </div>
+        <p id="stage-label" class="text-slate-500 text-xs mt-2">Stage 1 of 3 — Mapper</p>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════
+       VIEW 3 — DASHBOARD
+  ════════════════════════════════════════════════════════════ -->
+  <div id="dashboard-view" class="hidden relative z-10 min-h-screen px-6 py-10 max-w-6xl mx-auto">
+
+    <!-- Top bar -->
+    <div class="flex items-center justify-between mb-10 animate-fade-up">
+      <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded-lg btn-glow flex items-center justify-center shrink-0">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M3 2h10a1 1 0 011 1v3a1 1 0 01-1 1H9l-1 2H6l-1-2H3a1 1 0 01-1-1V3a1 1 0 011-1z" fill="white" opacity="0.9"/>
+            <circle cx="8" cy="12" r="2" fill="white" opacity="0.6"/>
+          </svg>
+        </div>
+        <span class="text-white font-semibold">Provisio</span>
+        <span class="text-slate-600 mx-1">›</span>
+        <span id="dash-repo-label" class="text-slate-400 text-sm font-mono truncate max-w-xs"></span>
+      </div>
+      <button id="reset-btn" class="btn-ghost text-slate-400 text-sm font-medium px-4 py-2 rounded-lg cursor-pointer">
+        ↺ Start Over
+      </button>
+    </div>
+
+    <!-- Stat strip -->
+    <div id="stat-strip" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 animate-fade-up"></div>
+
+    <!-- Main grid: Mapper left, Mentor + Coach right -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- ── Mapper card ── -->
+      <div class="glass p-6 animate-fade-up">
+        <h3 class="text-white font-semibold text-base mb-1">Architecture Map</h3>
+        <p class="text-slate-500 text-xs mb-5">Detected entry points &amp; file classification</p>
+
+        <p class="text-slate-500 text-xs uppercase tracking-widest font-medium mb-3">Entry Points</p>
+        <div id="entry-points" class="space-y-2 mb-6"></div>
+
+        <p class="text-slate-500 text-xs uppercase tracking-widest font-medium mb-3">File Classification</p>
+        <div id="file-classification" class="space-y-1.5 max-h-56 overflow-y-auto pr-1"></div>
+      </div>
+
+      <!-- ── Right column: Mentor + Coach ── -->
+      <div class="flex flex-col gap-6">
+
+        <!-- Mentor Q&A -->
+        <div class="glass p-6 animate-fade-up">
+          <h3 class="text-white font-semibold text-base mb-1">Mentor Q&amp;A</h3>
+          <p class="text-slate-500 text-xs mb-5">AI-generated answers to onboarding questions</p>
+          <div id="mentor-qa" class="space-y-4 max-h-96 overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- Coach Quiz -->
+        <div class="glass p-6 animate-fade-up">
+          <h3 class="text-white font-semibold text-base mb-1">Knowledge Quiz</h3>
+          <p class="text-slate-500 text-xs mb-5">Review questions to test your understanding</p>
+          <div id="coach-quiz" class="space-y-4 max-h-96 overflow-y-auto pr-1"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Recommended task -->
+    <div id="recommended-task-wrap" class="hidden glass p-6 mt-6 animate-fade-up">
+      <p class="text-slate-500 text-xs uppercase tracking-widest font-medium mb-2">Recommended First Task</p>
+      <p id="recommended-task-text" class="text-slate-200 text-sm leading-relaxed"></p>
+    </div>
+
+  </div><!-- /dashboard-view -->
+
+
+  <!-- ═══════════════════════════════════════════════════════════
+       JAVASCRIPT
+  ════════════════════════════════════════════════════════════ -->
+  <script>
+  (() => {
+    'use strict';
+
+    const API_URL = 'http://localhost:8000/api/analyze';
+
+    // ── View helpers ──────────────────────────────────────────
+    const views = ['landing-view', 'input-view', 'dashboard-view'];
+    function showView(id) {
+      views.forEach(v => document.getElementById(v).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── Nav bindings ──────────────────────────────────────────
+    document.getElementById('start-btn').addEventListener('click', () => showView('input-view'));
+    document.getElementById('back-btn').addEventListener('click', () => showView('landing-view'));
+    document.getElementById('reset-btn').addEventListener('click', resetUI);
+
+    // ── Stage label cycling during load ──────────────────────
+    const STAGES = [
+      { label: 'Stage 1 of 3 — Mapper',  dots: [1,0,0] },
+      { label: 'Stage 2 of 3 — Mentor',  dots: [1,1,0] },
+      { label: 'Stage 3 of 3 — Coach',   dots: [1,1,1] },
+    ];
+    let stageTimer = null;
+    function startStageAnimation() {
+      let idx = 0;
+      function tick() {
+        const s = STAGES[idx % STAGES.length];
+        document.getElementById('stage-label').textContent = s.label;
+        [1,2,3].forEach(n => {
+          const dot = document.getElementById('stage-dot-' + n);
+          dot.style.background = s.dots[n-1] ? '#818cf8' : 'rgba(255,255,255,0.1)';
+        });
+        idx++;
+        stageTimer = setTimeout(tick, 8000);
+      }
+      tick();
+    }
+    function stopStageAnimation() {
+      clearTimeout(stageTimer);
+    }
+
+    // ── Loading UI helpers ────────────────────────────────────
+    function setLoading(on) {
+      document.getElementById('form-section').classList.toggle('hidden', on);
+      const ls = document.getElementById('loading-section');
+      if (on) {
+        ls.classList.remove('hidden');
+        ls.classList.add('flex');
+        startStageAnimation();
+      } else {
+        ls.classList.add('hidden');
+        ls.classList.remove('flex');
+        stopStageAnimation();
+      }
+    }
+
+    // ── Analyze button ────────────────────────────────────────
+    document.getElementById('analyze-btn').addEventListener('click', async () => {
+      const errEl  = document.getElementById('input-error');
+      const target = document.getElementById('repo-url').value.trim();
+      errEl.classList.add('hidden');
+
+      if (!target) {
+        errEl.textContent = 'Please enter a GitHub URL.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.detail || `Server error ${res.status}`);
+        }
+
+        renderDashboard(target, data);
+        showView('dashboard-view');
+
+      } catch (err) {
+        errEl.textContent = err.message || 'An unexpected error occurred. Is the API running?';
+        errEl.classList.remove('hidden');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    // ── Allow Enter key in input ──────────────────────────────
+    document.getElementById('repo-url').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('analyze-btn').click();
+    });
+
+    // ── Reset ────────────────────────────────────────────────
+    function resetUI() {
+      document.getElementById('repo-url').value = '';
+      document.getElementById('input-error').classList.add('hidden');
+      showView('landing-view');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DASHBOARD RENDERING
+    // ═══════════════════════════════════════════════════════════
+
+    function renderDashboard(target, data) {
+      const { mapper, mentor, coach } = data;
+
+      // Breadcrumb label
+      document.getElementById('dash-repo-label').textContent = target;
+
+      // ── Stat strip ──────────────────────────────────────────
+      const entryCount   = (mapper?.entry_points  || []).length;
+      const fileCount    = Object.keys(mapper?.classification || {}).length;
+      const qaCount      = (mentor?.entries       || []).length;
+      const quizCount    = (coach?.quiz            || []).length;
+
+      const stats = [
+        { label: 'Entry Points',      value: entryCount },
+        { label: 'Files Classified',  value: fileCount  },
+        { label: 'Mentor Answers',    value: qaCount    },
+        { label: 'Quiz Questions',    value: quizCount  },
+      ];
+
+      const strip = document.getElementById('stat-strip');
+      strip.innerHTML = stats.map(s => `
+        <div class="glass p-4 text-center">
+          <p class="text-2xl font-extrabold grad-text">${s.value}</p>
+          <p class="text-slate-500 text-xs mt-1 font-medium">${esc(s.label)}</p>
+        </div>
+      `).join('');
+
+      // ── Entry points ─────────────────────────────────────────
+      const epEl = document.getElementById('entry-points');
+      const eps  = mapper?.entry_points || [];
+      if (eps.length === 0) {
+        epEl.innerHTML = '<p class="text-slate-600 text-xs">No entry points detected.</p>';
+      } else {
+        epEl.innerHTML = eps.map(ep => `
+          <div class="flex items-center justify-between px-3 py-2 rounded-lg" style="background:rgba(255,255,255,0.03);">
+            <span class="text-slate-200 text-sm font-mono">${esc(ep.file)}</span>
+            <span class="text-xs ${confidenceClass(ep.confidence)} px-2 py-0.5 rounded-full font-medium">${esc(ep.confidence)}</span>
+          </div>
+        `).join('');
+      }
+
+      // ── File classification ───────────────────────────────────
+      const fcEl  = document.getElementById('file-classification');
+      const files = Object.entries(mapper?.classification || {});
+      if (files.length === 0) {
+        fcEl.innerHTML = '<p class="text-slate-600 text-xs">No classification data.</p>';
+      } else {
+        fcEl.innerHTML = files.map(([name, info]) => `
+          <div class="flex items-start gap-2 px-3 py-2 rounded-lg" style="background:rgba(255,255,255,0.03);">
+            <span class="text-slate-300 text-xs font-mono truncate flex-1">${esc(name)}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full shrink-0 font-medium" style="background:rgba(129,140,248,0.12);color:#818cf8;border:1px solid rgba(129,140,248,0.2);">${esc(info.category || '—')}</span>
+          </div>
+        `).join('');
+      }
+
+      // ── Mentor Q&A ───────────────────────────────────────────
+      const mqEl    = document.getElementById('mentor-qa');
+      const entries = mentor?.entries || [];
+      if (entries.length === 0) {
+        mqEl.innerHTML = '<p class="text-slate-600 text-xs">No Q&A data available.</p>';
+      } else {
+        mqEl.innerHTML = entries.map((entry, i) => `
+          <details class="rounded-xl overflow-hidden" style="background:rgba(255,255,255,0.03);">
+            <summary class="cursor-pointer px-4 py-3 flex items-start gap-3 select-none list-none">
+              <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5" style="background:rgba(129,140,248,0.2);color:#818cf8;">${i+1}</span>
+              <span class="text-slate-200 text-sm font-medium leading-snug flex-1">${esc(entry.question)}</span>
+              <span class="shrink-0 text-xs ${confidenceClass(entry.developer_confidence)} px-2 py-0.5 rounded-full font-medium self-center hidden sm:inline">${esc(entry.developer_confidence || '')}</span>
+            </summary>
+            <div class="px-4 pb-4 pt-1">
+              <p class="text-slate-400 text-xs leading-relaxed whitespace-pre-wrap">${esc(trimAnswer(entry.answer))}</p>
+            </div>
+          </details>
+        `).join('');
+      }
+
+      // ── Coach quiz ───────────────────────────────────────────
+      const cqEl = document.getElementById('coach-quiz');
+      const quiz = coach?.quiz || [];
+      if (quiz.length === 0) {
+        cqEl.innerHTML = '<p class="text-slate-600 text-xs">No quiz data available.</p>';
+      } else {
+        cqEl.innerHTML = quiz.map((q, i) => `
+          <div class="rounded-xl px-4 py-3" style="background:rgba(255,255,255,0.03);">
+            <div class="flex items-start gap-3 mb-2">
+              <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5" style="background:rgba(168,85,247,0.2);color:#a78bfa;">${i+1}</span>
+              <p class="text-slate-200 text-sm font-medium leading-snug flex-1">${esc(q.question)}</p>
+            </div>
+            ${q.expected_keywords?.length ? `
+              <div class="flex flex-wrap gap-1.5 pl-8 mt-2">
+                ${q.expected_keywords.map(k => `<span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.05);color:rgba(226,232,240,0.5);">${esc(k)}</span>`).join('')}
+              </div>
+            ` : ''}
+            <div class="pl-8 mt-2">
+              <span class="text-xs ${verdictClass(q.verdict)} px-2 py-0.5 rounded-full font-medium">${esc(q.verdict?.replace(/_/g,' ') || 'pending')}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // ── Recommended task ──────────────────────────────────────
+      const rt     = coach?.recommended_task;
+      const rtWrap = document.getElementById('recommended-task-wrap');
+      if (rt) {
+        document.getElementById('recommended-task-text').textContent = rt;
+        rtWrap.classList.remove('hidden');
+      } else {
+        rtWrap.classList.add('hidden');
+      }
+    }
+
+    // ── Utilities ────────────────────────────────────────────
+    function esc(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Strip verbose RAG header lines from mentor answers
+    function trimAnswer(raw) {
+      if (!raw) return '';
+      const lines = raw.split('\n');
+      // Drop everything up to and including the separator line (──── repeated)
+      const sep = lines.findIndex(l => /^─{10,}/.test(l.trim()));
+      if (sep === -1) return raw.trim();
+      // Find the last such separator block and return text after it
+      let lastSep = sep;
+      for (let i = sep + 1; i < lines.length; i++) {
+        if (/^─{10,}/.test(lines[i].trim())) lastSep = i;
+      }
+      return lines.slice(lastSep + 1).join('\n').trim() || raw.trim();
+    }
+
+    function confidenceClass(c) {
+      if (!c) return '';
+      const m = c.toLowerCase();
+      if (m === 'high')   return 'badge-high';
+      if (m === 'medium') return 'badge-medium';
+      return 'badge-low';
+    }
+
+    function verdictClass(v) {
+      if (!v) return 'badge-review';
+      const m = v.toLowerCase();
+      if (m === 'pass')                    return 'badge-pass';
+      if (m === 'fail')                    return 'badge-fail';
+      return 'badge-review';
+    }
+
+  })();
+
+  // ── Constellation network canvas ────────────────────────────
+  (() => {
+    const canvas = document.getElementById('bg-canvas');
+    const ctx    = canvas.getContext('2d');
+
+    // Palette: alternating shades of #818cf8 / #a78bfa
+    const COLORS = ['129,140,248', '167,139,250', '129,140,248', '192,132,252', '139,92,246'];
+    const NODE_COUNT  = 90;
+    const MAX_DIST    = 160;
+    const NODE_RADIUS = 2.2;
+    const MOUSE_REPEL = 110;   // px radius of cursor influence
+    const REPEL_FORCE = 0.012; // gentle nudge strength
+
+    // Fraction of nodes seeded into each side flank to guarantee visual density
+    const FLANK_SHARE = 0.28; // 28% left zone + 28% right zone + 44% centre
+
+    let W, H, nodes;
+    let mouseX = -9999, mouseY = -9999;
+
+    function resize() {
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+
+    function makeNode(xOverride) {
+      const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+      return {
+        x:  xOverride !== undefined ? xOverride : Math.random() * W,
+        y:  Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.22,
+        vy: (Math.random() - 0.5) * 0.22,
+        color,
+      };
+    }
+
+    function init() {
+      resize();
+      const flankCount = Math.round(NODE_COUNT * FLANK_SHARE);
+      nodes = [];
+      // Left flank: x in [0, 28% of W]
+      for (let i = 0; i < flankCount; i++) {
+        nodes.push(makeNode(Math.random() * W * 0.28));
+      }
+      // Right flank: x in [72% of W, W]
+      for (let i = 0; i < flankCount; i++) {
+        nodes.push(makeNode(W * 0.72 + Math.random() * W * 0.28));
+      }
+      // Centre fill: remaining nodes, purely random
+      const remaining = NODE_COUNT - flankCount * 2;
+      for (let i = 0; i < remaining; i++) {
+        nodes.push(makeNode());
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+
+      // edges
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx   = nodes[i].x - nodes[j].x;
+          const dy   = nodes[i].y - nodes[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < MAX_DIST) {
+            const alpha = (1 - dist / MAX_DIST) * 0.4;
+            ctx.beginPath();
+            ctx.moveTo(nodes[i].x, nodes[i].y);
+            ctx.lineTo(nodes[j].x, nodes[j].y);
+            ctx.strokeStyle = `rgba(${nodes[i].color},${alpha})`;
+            ctx.lineWidth   = 0.65;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // nodes
+      for (const n of nodes) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, NODE_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${n.color},0.8)`;
+        ctx.fill();
+      }
+    }
+
+    function update() {
+      for (const n of nodes) {
+        // Mouse repulsion
+        const mdx = n.x - mouseX;
+        const mdy = n.y - mouseY;
+        const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
+        if (mdist < MOUSE_REPEL && mdist > 0) {
+          const force = (1 - mdist / MOUSE_REPEL) * REPEL_FORCE;
+          n.vx += (mdx / mdist) * force;
+          n.vy += (mdy / mdist) * force;
+        }
+
+        // Speed cap — keep drift slow and ambient
+        const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+        const maxSpeed = 0.55;
+        if (speed > maxSpeed) {
+          n.vx = (n.vx / speed) * maxSpeed;
+          n.vy = (n.vy / speed) * maxSpeed;
+        }
+
+        n.x += n.vx;
+        n.y += n.vy;
+
+        // Soft bounce off edges
+        if (n.x < 0) { n.x = 0; n.vx = Math.abs(n.vx); }
+        if (n.x > W) { n.x = W; n.vx = -Math.abs(n.vx); }
+        if (n.y < 0) { n.y = 0; n.vy = Math.abs(n.vy); }
+        if (n.y > H) { n.y = H; n.vy = -Math.abs(n.vy); }
+      }
+    }
+
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+    window.addEventListener('resize', () => {
+      resize();
+      for (const n of nodes) {
+        if (n.x > W) n.x = W;
+        if (n.y > H) n.y = H;
+      }
+    });
+
+    window.addEventListener('mousemove', e => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
+    window.addEventListener('mouseleave', () => {
+      mouseX = -9999;
+      mouseY = -9999;
+    });
+
+    init();
+    loop();
+  })();
+  </script>
+
+</body>
+</html>

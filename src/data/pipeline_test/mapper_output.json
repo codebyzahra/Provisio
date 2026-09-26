@@ -1,0 +1,135 @@
+{
+  "repo_root": ".",
+  "generated_at": "2026-09-26T14:05:53.629143",
+  "entry_points": [
+    {
+      "file": "mapper_schema.py",
+      "import_count": 5,
+      "confidence": "high"
+    },
+    {
+      "file": "mentor_schema.py",
+      "import_count": 4,
+      "confidence": "medium"
+    },
+    {
+      "file": "coach_schema.py",
+      "import_count": 2,
+      "confidence": "medium"
+    },
+    {
+      "file": "mentor.py",
+      "import_count": 2,
+      "confidence": "medium"
+    },
+    {
+      "file": "coach.py",
+      "import_count": 1,
+      "confidence": "low"
+    },
+    {
+      "file": "mapper.py",
+      "import_count": 1,
+      "confidence": "low"
+    },
+    {
+      "file": "pipeline.py",
+      "import_count": 0,
+      "confidence": "low"
+    },
+    {
+      "file": "test_mentor.py",
+      "import_count": 0,
+      "confidence": "low"
+    }
+  ],
+  "classification": {
+    "coach.py": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "coach_output.json": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "coach_schema.py": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "mapper.py": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "mapper_output.json": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "mapper_schema.py": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "mentor.py": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "mentor_schema.py": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "pipeline.py": {
+      "category": "unclear",
+      "reason": "no rule matched"
+    },
+    "README.md": {
+      "category": "documentation",
+      "reason": "filename matches 'README*' → documentation"
+    },
+    "test_mentor.py": {
+      "category": "testing",
+      "reason": "filename matches 'test_*.py' → testing"
+    }
+  },
+  "setup": {
+    "language": "unknown",
+    "dependencies_file": null,
+    "run_steps": []
+  },
+  "unclear_items": [
+    {
+      "path": "coach.py",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "coach_output.json",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "coach_schema.py",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "mapper.py",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "mapper_output.json",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "mapper_schema.py",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "mentor.py",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "mentor_schema.py",
+      "reason": "no rule matched"
+    },
+    {
+      "path": "pipeline.py",
+      "reason": "no rule matched"
+    }
+  ]
+}
