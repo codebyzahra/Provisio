@@ -60,6 +60,18 @@ def analyze(request: AnalyzeRequest) -> dict:
     if not target:
         raise HTTPException(status_code=400, detail="'target' must not be blank.")
 
+    # URL validation — only accept well-formed public GitHub repository URLs.
+    if target.startswith("http://") or target.startswith("https://"):
+        import re  # noqa: PLC0415
+        if not re.fullmatch(r"https://github\.com/[^/]+/[^/]+(/.*)?", target):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid URL. Please provide a valid public GitHub repository URL "
+                    "(e.g., https://github.com/owner/repo)."
+                ),
+            )
+
     # Lazy import — pipeline and its siblings are resolvable because _SRC is
     # already on sys.path (added at module load above).
     from . import pipeline  # noqa: PLC0415
@@ -69,10 +81,21 @@ def analyze(request: AnalyzeRequest) -> dict:
         with redirect_stdout(buf), redirect_stderr(buf):
             pipeline.run_pipeline(target)
     except SystemExit:
-        raise HTTPException(status_code=500, detail=buf.getvalue())
+        err = buf.getvalue().lower()
+        if any(k in err for k in ("exit 128", "fatal", "not found")):
+            raise HTTPException(
+                status_code=404,
+                detail="Repository not found. Please ensure the repository exists and is public.",
+            )
+        raise HTTPException(status_code=500, detail="Failed to process repository. Please try again.")
     except Exception as exc:  # noqa: BLE001
-        buf.write(f"\nUnexpected error: {exc}")
-        raise HTTPException(status_code=500, detail=buf.getvalue())
+        err = f"{exc}".lower()
+        if any(k in err for k in ("exit 128", "fatal", "not found")):
+            raise HTTPException(
+                status_code=404,
+                detail="Repository not found. Please ensure the repository exists and is public.",
+            )
+        raise HTTPException(status_code=500, detail="Failed to process repository. Please try again.")
 
     # Read the three output files written to the project root.
     result: dict = {}

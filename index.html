@@ -534,17 +534,20 @@
           body: JSON.stringify({ target }),
         });
 
-        const data = await res.json();
-
         if (!res.ok) {
-          throw new Error(data.detail || `Server error ${res.status}`);
+          const errData = await res.json().catch(() => ({}));
+          const message = errData.detail || 'Unable to analyze repository. Please check your input.';
+          errEl.textContent = message;
+          errEl.classList.remove('hidden');
+          return;
         }
 
+        const data = await res.json();
         renderDashboard(target, data);
         showView('dashboard-view');
 
       } catch (err) {
-        errEl.textContent = err.message || 'An unexpected error occurred. Is the API running?';
+        errEl.textContent = 'Unable to analyze repository. Is the API running?';
         errEl.classList.remove('hidden');
       } finally {
         setLoading(false);
