@@ -709,7 +709,8 @@
       const rt     = coach?.recommended_task;
       const rtWrap = document.getElementById('recommended-task-wrap');
       if (rt) {
-        document.getElementById('recommended-task-text').textContent = rt;
+        document.getElementById('recommended-task-text').textContent =
+          rt.reason || `Start with \`${rt.file}\``;
         rtWrap.classList.remove('hidden');
       } else {
         rtWrap.classList.add('hidden');
@@ -756,8 +757,8 @@
     function verdictClass(v) {
       if (!v) return 'badge-review';
       const m = v.toLowerCase();
-      if (m === 'pass')                    return 'badge-pass';
-      if (m === 'fail')                    return 'badge-fail';
+      if (m === 'understood')              return 'badge-pass';
+      if (m === 'needs_review')            return 'badge-review';
       return 'badge-review';
     }
 
