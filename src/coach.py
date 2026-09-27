@@ -46,6 +46,23 @@ _UNDERSTOOD_THRESHOLD: float = 0.5
 # Quiz generation
 # ---------------------------------------------------------------------------
 
+
+def _compute_quiz_n(session_len: int) -> int:
+    """Return a context-aware quiz question count scaled to *session_len*.
+
+    Clamps to the range [1, 6] so that a single-entry session produces one
+    focused question rather than fabricated filler, while large sessions are
+    capped to avoid an overwhelming quiz.
+
+    Args:
+        session_len: Number of entries in the Mentor session log.
+
+    Returns:
+        An integer between 1 and 6 (inclusive).
+    """
+    return min(max(session_len, 1), 6)
+
+
 def generate_quiz(session: list[SessionEntry], n: int = 3) -> list[QuizItem]:
     """Generate *n* quiz questions from the topics covered in *session*.
 
@@ -61,6 +78,8 @@ def generate_quiz(session: list[SessionEntry], n: int = 3) -> list[QuizItem]:
         session: Ordered list of :class:`~mentor_schema.SessionEntry` objects
                  from the Mentor session log.
         n:       Number of quiz questions to generate.  Defaults to 3.
+                 Callers should use :func:`_compute_quiz_n` to derive a
+                 context-aware count (1–6) scaled to the session length.
 
     Returns:
         A list of :class:`~coach_schema.QuizItem` objects with empty
@@ -557,7 +576,7 @@ def run_coach_session(
 
     Steps:
     1. Validate that the session log is non-empty.
-    2. Generate 3 quiz questions from the session log.
+    2. Generate 1–6 quiz questions scaled to session size.
     3. Score the developer's answers.
     4. Build the ``topic_scores`` mapping.
     5. Recommend one starter task from ``entry_points``.
@@ -569,7 +588,7 @@ def run_coach_session(
         mentor_output:  Loaded :class:`~mentor_schema.MentorOutput` from the
                         Mentor Agent.
         answers:        Developer's quiz answers as an ordered list of strings.
-                        May be shorter than 3 (unanswered items → needs_review)
+                        May be shorter than the generated count (unanswered items → needs_review)
                         or empty (all items → needs_review).
 
     Returns:
@@ -587,7 +606,7 @@ def run_coach_session(
         )
 
     # --- Step 1: generate quiz ------------------------------------------- #
-    quiz = generate_quiz(mentor_output.entries, n=3)
+    quiz = generate_quiz(mentor_output.entries, n=_compute_quiz_n(len(mentor_output.entries)))
 
     # --- Step 2: score answers ------------------------------------------- #
     scored_quiz = score_quiz(quiz, answers)

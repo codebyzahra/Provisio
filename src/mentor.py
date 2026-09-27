@@ -448,10 +448,11 @@ def retrieve(
 _SYSTEM_PROMPT = textwrap.dedent(
     """\
     You are Mentor, an onboarding assistant for software developers.
-    You answer questions about a codebase using only the context provided below.
+    Analyze the project's purpose, how files are linked, and the role of core files.
+    Use the context provided to explain architecture, data flow, and file responsibilities.
+    If context is sparse, logically deduce the architecture from filenames, imports, and README content.
+    Never output refusals such as "I don't have enough information" — always reason from available evidence.
     Be concise, precise, and developer-friendly.
-    If the context does not contain enough information, say so explicitly.
-    Do not invent details that are not in the context.
     """
 )
 
@@ -518,10 +519,12 @@ def ask(
 ) -> str:
     """Retrieve relevant chunks and generate a grounded answer.
 
-    Retrieves the *top_k* most similar chunks for *question* and generates an
-    answer from them.  If the highest-scoring chunk's similarity falls below
-    :data:`RELEVANCE_THRESHOLD`, returns :data:`INSUFFICIENT_INFO_RESPONSE`
-    instead of fabricating an answer.
+    Retrieves the *top_k* most similar chunks for *question* and passes all
+    non-empty results to the LLM regardless of score.  The LLM is instructed
+    to reason architecturally from whatever context is available, so even
+    low-similarity chunks from a small codebase yield a useful answer.
+    Returns :data:`INSUFFICIENT_INFO_RESPONSE` only when the knowledge base
+    produces *no* chunks at all.
 
     Args:
         question: The natural-language question to answer.
@@ -529,12 +532,12 @@ def ask(
         top_k: Number of chunks to retrieve and present as context.
 
     Returns:
-        A grounded answer string, or :data:`INSUFFICIENT_INFO_RESPONSE` when
-        the knowledge base does not contain sufficient relevant information.
+        A grounded LLM-generated answer string, or
+        :data:`INSUFFICIENT_INFO_RESPONSE` when the knowledge base is empty.
     """
     retrieved = retrieve(question, chunks, top_k=top_k)
 
-    if not retrieved or retrieved[0].get("score", 0.0) < RELEVANCE_THRESHOLD:
+    if not retrieved:
         return INSUFFICIENT_INFO_RESPONSE
 
     context_block = _build_context_block(retrieved)

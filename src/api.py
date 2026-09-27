@@ -72,30 +72,34 @@ def analyze(request: AnalyzeRequest) -> dict:
                 ),
             )
 
-    # Lazy import — pipeline and its siblings are resolvable because _SRC is
-    # already on sys.path (added at module load above).
-    from . import pipeline  # noqa: PLC0415
+    # pipeline and its siblings are resolvable via absolute import because
+    # _SRC is already on sys.path (added at module load above).
+    import pipeline  # noqa: PLC0415
 
     buf = io.StringIO()
     try:
         with redirect_stdout(buf), redirect_stderr(buf):
             pipeline.run_pipeline(target)
     except SystemExit:
-        err = buf.getvalue().lower()
+        captured = buf.getvalue()
+        err = captured.lower()
         if any(k in err for k in ("exit 128", "fatal", "not found")):
             raise HTTPException(
                 status_code=404,
                 detail="Repository not found. Please ensure the repository exists and is public.",
             )
-        raise HTTPException(status_code=500, detail="Failed to process repository. Please try again.")
+        raise HTTPException(status_code=500, detail=captured or "Failed to process repository. Please try again.")
     except Exception as exc:  # noqa: BLE001
-        err = f"{exc}".lower()
+        captured = buf.getvalue()
+        err = f"{exc} {captured}".lower()
         if any(k in err for k in ("exit 128", "fatal", "not found")):
             raise HTTPException(
                 status_code=404,
                 detail="Repository not found. Please ensure the repository exists and is public.",
             )
-        raise HTTPException(status_code=500, detail="Failed to process repository. Please try again.")
+        import traceback as _tb  # noqa: PLC0415
+        detail = f"{exc}\n{_tb.format_exc()}"
+        raise HTTPException(status_code=500, detail=detail)
 
     # Read the three output files written to the project root.
     result: dict = {}

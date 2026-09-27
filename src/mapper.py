@@ -40,6 +40,14 @@ CLONE_DEST: str = "data/target_repo"
 
 SKIP_DIRS: frozenset[str] = frozenset({".git", "node_modules", "venv", "__pycache__"})
 
+# File extensions that unambiguously indicate source code.
+# Used as a final fallback when neither the folder nor the filename tier matches.
+_SOURCE_CODE_EXTENSIONS: frozenset[str] = frozenset({
+    ".py", ".js", ".ts", ".jsx", ".tsx",
+    ".java", ".go", ".rb", ".rs",
+    ".cpp", ".c", ".cs", ".php", ".swift", ".kt",
+})
+
 IMPORT_CONFIDENCE_HIGH: int = 5
 IMPORT_CONFIDENCE_MEDIUM: int = 2
 
@@ -139,7 +147,9 @@ def classify_paths(
     3. If both tiers fire and **agree** → use the file-level reason.
     4. If both tiers fire and **disagree** → ``unclear`` /
        ``ambiguous: matched X and Y``.
-    5. If nothing matches → ``unclear`` / ``no rule matched``.
+    5. If nothing matches → check file extension against
+       ``_SOURCE_CODE_EXTENSIONS``; if matched → ``core_logic``.
+       Otherwise → ``unclear`` / ``no rule matched``.
     """
     result: dict[str, dict[str, str]] = {}
 
@@ -219,9 +229,14 @@ def classify_paths(
                 )
 
         else:
-            # No rule fired at either tier.
-            category = Category.UNCLEAR
-            reason = "no rule matched"
+            # No rule fired at either tier — check for a known source extension.
+            suffix = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+            if suffix in _SOURCE_CODE_EXTENSIONS:
+                category = Category.CORE_LOGIC
+                reason = f"source file extension matched {suffix}"
+            else:
+                category = Category.UNCLEAR
+                reason = "no rule matched"
 
         result[path] = {"category": category.value, "reason": reason}
 
@@ -559,9 +574,18 @@ def main(argv: list[str] | None = None) -> "MapperOutput":
         unclear_items=unclear_items,
     )
 
-    # 7. Print as JSON.
-    # Save the output to disk for the Mentor Agent
+    # 7. Save to disk and print as JSON.
+    # Re-wrap stdout with UTF-8 so the → characters in reason strings don't
+    # crash on Windows consoles that default to cp1252.  Inside the API the
+    # redirect_stdout context already uses StringIO (always UTF-8 safe), so
+    # this is a no-op there.
     mapper_output.to_json_file("mapper_output.json")
+    out = sys.stdout
+    if hasattr(out, "reconfigure"):          # Python ≥ 3.7 TextIOWrapper
+        try:
+            out.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:                    # already replaced / StringIO
+            pass
     print(mapper_output.model_dump_json(indent=2))
     return mapper_output
 
