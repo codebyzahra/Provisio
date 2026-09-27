@@ -338,6 +338,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="URL",
         help="Remote git URL to shallow-clone into data/target_repo/.",
     )
+    parser.add_argument(
+        "--output-dir",
+        metavar="DIR",
+        default=None,
+        help="If provided, also write mapper_output.json into this directory.",
+    )
     return parser.parse_args(argv)
 
 
@@ -526,8 +532,11 @@ def rank_by_imports(
 # Sub-Task 4 — main() wiring
 # ---------------------------------------------------------------------------
 
-def main(argv: list[str] | None = None) -> "MapperOutput":
+def main(argv: list[str] | None = None, output_dir: str | None = None) -> "MapperOutput":
     args = parse_args(argv)
+    # --output-dir from CLI takes precedence; programmatic output_dir is the fallback.
+    if args.output_dir is not None:
+        output_dir = args.output_dir
 
     # 1. Resolve root path (clone if URL).
     if args.url:
@@ -580,6 +589,9 @@ def main(argv: list[str] | None = None) -> "MapperOutput":
     # redirect_stdout context already uses StringIO (always UTF-8 safe), so
     # this is a no-op there.
     mapper_output.to_json_file("mapper_output.json")
+    if output_dir is not None:
+        os.makedirs(output_dir, exist_ok=True)
+        mapper_output.to_json_file(os.path.join(output_dir, "mapper_output.json"))
     out = sys.stdout
     if hasattr(out, "reconfigure"):          # Python ≥ 3.7 TextIOWrapper
         try:

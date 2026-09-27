@@ -1,40 +1,35 @@
 {
-  "repo_root": ".",
-  "generated_at": "2026-09-26T14:10:08.377208",
+  "repo_root": "data/target_repo",
+  "generated_at": "2026-09-27T13:06:56.935740",
   "entry_points": [
     {
       "file": "src/mapper_schema.py",
-      "import_count": 7,
+      "import_count": 6,
       "confidence": "high"
     },
     {
       "file": "src/mentor_schema.py",
-      "import_count": 5,
-      "confidence": "high"
+      "import_count": 4,
+      "confidence": "medium"
     },
     {
       "file": "src/coach.py",
-      "import_count": 3,
+      "import_count": 2,
       "confidence": "medium"
     },
     {
       "file": "src/coach_schema.py",
-      "import_count": 3,
+      "import_count": 2,
       "confidence": "medium"
     },
     {
       "file": "src/mapper.py",
-      "import_count": 2,
-      "confidence": "medium"
+      "import_count": 1,
+      "confidence": "low"
     },
     {
       "file": "src/mentor.py",
-      "import_count": 2,
-      "confidence": "medium"
-    },
-    {
-      "file": "src/pipeline.py",
-      "import_count": 0,
+      "import_count": 1,
       "confidence": "low"
     },
     {
@@ -70,10 +65,6 @@
       "category": "unclear",
       "reason": "no rule matched"
     },
-    "pipeline-plan.md": {
-      "category": "documentation",
-      "reason": "filename matches '*.md' → documentation"
-    },
     "README.md": {
       "category": "documentation",
       "reason": "filename matches 'README*' → documentation"
@@ -81,22 +72,6 @@
     "requirements.txt": {
       "category": "configuration",
       "reason": "filename matches 'requirements.txt' → configuration"
-    },
-    ".pytest_cache/.gitignore": {
-      "category": "unclear",
-      "reason": "no rule matched"
-    },
-    ".pytest_cache/CACHEDIR.TAG": {
-      "category": "unclear",
-      "reason": "no rule matched"
-    },
-    ".pytest_cache/README.md": {
-      "category": "documentation",
-      "reason": "filename matches 'README*' → documentation"
-    },
-    ".pytest_cache/v/cache/nodeids": {
-      "category": "unclear",
-      "reason": "no rule matched"
     },
     "bob_sessions/bobs_builders_task01_cli_walker_summary.png": {
       "category": "unclear",
@@ -174,10 +149,6 @@
       "category": "core_logic",
       "reason": "folder 'src' → core_logic"
     },
-    "src/mapper_output.json": {
-      "category": "core_logic",
-      "reason": "folder 'src' → core_logic"
-    },
     "src/mapper_schema.py": {
       "category": "core_logic",
       "reason": "folder 'src' → core_logic"
@@ -190,10 +161,6 @@
       "category": "core_logic",
       "reason": "folder 'src' → core_logic"
     },
-    "src/pipeline.py": {
-      "category": "core_logic",
-      "reason": "folder 'src' → core_logic"
-    },
     "src/README.md": {
       "category": "unclear",
       "reason": "ambiguous: matched core_logic (folder) and documentation (filename)"
@@ -201,18 +168,6 @@
     "src/test_mentor.py": {
       "category": "unclear",
       "reason": "ambiguous: matched core_logic (folder) and testing (filename)"
-    },
-    "src/data/pipeline_test/coach_output.json": {
-      "category": "core_logic",
-      "reason": "folder 'src' → core_logic"
-    },
-    "src/data/pipeline_test/mapper_output.json": {
-      "category": "core_logic",
-      "reason": "folder 'src' → core_logic"
-    },
-    "src/data/pipeline_test/mentor_output.json": {
-      "category": "core_logic",
-      "reason": "folder 'src' → core_logic"
     },
     "tests/coach_output.json": {
       "category": "testing",
@@ -249,18 +204,6 @@
     },
     {
       "path": "mentor_output.json",
-      "reason": "no rule matched"
-    },
-    {
-      "path": ".pytest_cache/.gitignore",
-      "reason": "no rule matched"
-    },
-    {
-      "path": ".pytest_cache/CACHEDIR.TAG",
-      "reason": "no rule matched"
-    },
-    {
-      "path": ".pytest_cache/v/cache/nodeids",
       "reason": "no rule matched"
     },
     {

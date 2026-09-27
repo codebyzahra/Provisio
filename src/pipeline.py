@@ -158,6 +158,7 @@ def _output_path(output_dir: str, filename: str) -> str:
 def _run_mapper(args: argparse.Namespace, output_dir: str) -> MapperOutput:
     """Stage 1: run Mapper and return a validated MapperOutput."""
     mapper_argv = ["--path", args.path] if args.path else ["--url", args.url]
+    mapper_argv += ["--output-dir", output_dir]
 
     try:
         mapper_output = mapper.main(mapper_argv)
@@ -166,11 +167,7 @@ def _run_mapper(args: argparse.Namespace, output_dir: str) -> MapperOutput:
     except Exception as exc:  # noqa: BLE001
         _fail("Mapper", str(exc))
 
-    # mapper.main() saves to mapper_output.json in the CWD; if a different
-    # output_dir was requested, write there as well.
     dest = _output_path(output_dir, "mapper_output.json")
-    if os.path.abspath(dest) != os.path.abspath("mapper_output.json"):
-        mapper_output.to_json_file(dest)
 
     # Validate by round-tripping through the file (per plan requirement).
     try:
