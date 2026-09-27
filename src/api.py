@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import shutil
 import sys
+import tempfile
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
@@ -44,15 +47,36 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Request model
+# Request models
 # ---------------------------------------------------------------------------
 class AnalyzeRequest(BaseModel):
     target: str
 
 
+class QuizScoreRequest(BaseModel):
+    quiz: list[dict]
+    answers: list[str]
+
+
 # ---------------------------------------------------------------------------
-# Endpoint
+# Endpoints
 # ---------------------------------------------------------------------------
+@app.post("/api/quiz/score")
+def quiz_score(request: QuizScoreRequest) -> list[dict]:
+    """Reconstruct QuizItem objects, score the developer's answers, and return results."""
+    import coach as _coach  # noqa: PLC0415
+    from coach_schema import QuizItem  # noqa: PLC0415
+
+    try:
+        quiz_items = [QuizItem(**item) for item in request.quiz]
+        scored = _coach.score_quiz(quiz=quiz_items, answers=request.answers)
+        return [item.model_dump() for item in scored]
+    except Exception as exc:  # noqa: BLE001
+        import traceback as _tb  # noqa: PLC0415
+        detail = f"{exc}\n{_tb.format_exc()}"
+        raise HTTPException(status_code=500, detail=detail)
+
+
 @app.post("/api/analyze")
 def analyze(request: AnalyzeRequest) -> dict:
     """Run the full Mapper → Mentor → Coach pipeline and return all outputs."""
@@ -76,40 +100,50 @@ def analyze(request: AnalyzeRequest) -> dict:
     # _SRC is already on sys.path (added at module load above).
     import pipeline  # noqa: PLC0415
 
+    request_dir = tempfile.mkdtemp(prefix="provisio_")
     buf = io.StringIO()
     try:
-        with redirect_stdout(buf), redirect_stderr(buf):
-            pipeline.run_pipeline(target)
-    except SystemExit:
-        captured = buf.getvalue()
-        err = captured.lower()
-        if any(k in err for k in ("exit 128", "fatal", "not found")):
-            raise HTTPException(
-                status_code=404,
-                detail="Repository not found. Please ensure the repository exists and is public.",
-            )
-        raise HTTPException(status_code=500, detail=captured or "Failed to process repository. Please try again.")
-    except Exception as exc:  # noqa: BLE001
-        captured = buf.getvalue()
-        err = f"{exc} {captured}".lower()
-        if any(k in err for k in ("exit 128", "fatal", "not found")):
-            raise HTTPException(
-                status_code=404,
-                detail="Repository not found. Please ensure the repository exists and is public.",
-            )
-        import traceback as _tb  # noqa: PLC0415
-        detail = f"{exc}\n{_tb.format_exc()}"
-        raise HTTPException(status_code=500, detail=detail)
-
-    # Read the three output files written to the project root.
-    result: dict = {}
-    for key, path in _OUTPUT_FILES.items():
         try:
-            result[key] = json.loads(path.read_text(encoding="utf-8"))
+            with redirect_stdout(buf), redirect_stderr(buf):
+                pipeline.run_pipeline(target, output_dir=request_dir)
+        except SystemExit:
+            captured = buf.getvalue()
+            err = captured.lower()
+            if any(k in err for k in ("exit 128", "fatal", "not found")):
+                raise HTTPException(
+                    status_code=404,
+                    detail="Repository not found. Please ensure the repository exists and is public.",
+                )
+            raise HTTPException(status_code=500, detail=captured or "Failed to process repository. Please try again.")
         except Exception as exc:  # noqa: BLE001
-            raise HTTPException(
-                status_code=500,
-                detail=f"Pipeline completed but could not read {path.name}: {exc}",
-            )
+            captured = buf.getvalue()
+            err = f"{exc} {captured}".lower()
+            if any(k in err for k in ("exit 128", "fatal", "not found")):
+                raise HTTPException(
+                    status_code=404,
+                    detail="Repository not found. Please ensure the repository exists and is public.",
+                )
+            import traceback as _tb  # noqa: PLC0415
+            detail = f"{exc}\n{_tb.format_exc()}"
+            raise HTTPException(status_code=500, detail=detail)
 
-    return result
+        # Read the three output files from this request's private directory.
+        _request_output_files = {
+            "mapper": os.path.join(request_dir, "mapper_output.json"),
+            "mentor": os.path.join(request_dir, "mentor_output.json"),
+            "coach": os.path.join(request_dir, "coach_output.json"),
+        }
+        result: dict = {}
+        for key, path in _request_output_files.items():
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    result[key] = json.load(fh)
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Pipeline completed but could not read {os.path.basename(path)}: {exc}",
+                )
+
+        return result
+    finally:
+        shutil.rmtree(request_dir, ignore_errors=True)

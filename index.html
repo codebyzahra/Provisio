@@ -495,6 +495,11 @@
     'use strict';
 
     const API_URL = 'http://localhost:8000/api/analyze';
+    const QUIZ_SCORE_URL = 'http://localhost:8000/api/quiz/score';
+
+    // Stores the last /api/analyze response so the quiz submit handler can
+    // read and update it outside the analyze-btn click scope.
+    let lastAnalyzeData = null;
 
     // ── View helpers ──────────────────────────────────────────
     const views = ['landing-view', 'input-view', 'dashboard-view'];
@@ -579,6 +584,7 @@
         }
 
         const data = await res.json();
+        lastAnalyzeData = data;
         renderDashboard(target, data);
         showView('dashboard-view');
 
@@ -682,28 +688,113 @@
       }
 
       // ── Coach quiz ───────────────────────────────────────────
+      renderQuiz(coach?.quiz || []);
+
+    // ── Quiz renderer (extracted so the submit handler can call it again) ──
+    function renderQuiz(quiz) {
       const cqEl = document.getElementById('coach-quiz');
-      const quiz = coach?.quiz || [];
+      // Remove any previously appended submit button / error message
+      const oldBtn  = document.getElementById('quiz-submit-btn');
+      const oldErr  = document.getElementById('quiz-submit-error');
+      if (oldBtn) oldBtn.remove();
+      if (oldErr) oldErr.remove();
+
       if (quiz.length === 0) {
         cqEl.innerHTML = '<p class="text-slate-600 text-xs">No quiz data available.</p>';
-      } else {
-        cqEl.innerHTML = quiz.map((q, i) => `
-          <div class="rounded-xl px-4 py-3" style="background:rgba(255,255,255,0.03);">
-            <div class="flex items-start gap-3 mb-2">
-              <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5" style="background:rgba(168,85,247,0.2);color:#a78bfa;">${i+1}</span>
-              <p class="text-slate-200 text-sm font-medium leading-snug flex-1">${esc(q.question)}</p>
-            </div>
-            ${q.expected_keywords?.length ? `
-              <div class="flex flex-wrap gap-1.5 pl-8 mt-2">
-                ${q.expected_keywords.map(k => `<span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.05);color:rgba(226,232,240,0.5);">${esc(k)}</span>`).join('')}
-              </div>
-            ` : ''}
-            <div class="pl-8 mt-2">
-              <span class="text-xs ${verdictClass(q.verdict)} px-2 py-0.5 rounded-full font-medium">${esc(q.verdict?.replace(/_/g,' ') || 'pending')}</span>
-            </div>
-          </div>
-        `).join('');
+        return;
       }
+
+      cqEl.innerHTML = quiz.map((q, i) => `
+        <div class="rounded-xl px-4 py-3" style="background:rgba(255,255,255,0.03);">
+          <div class="flex items-start gap-3 mb-2">
+            <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5" style="background:rgba(168,85,247,0.2);color:#a78bfa;">${i+1}</span>
+            <p class="text-slate-200 text-sm font-medium leading-snug flex-1">${esc(q.question)}</p>
+          </div>
+          ${q.expected_keywords?.length ? `
+            <div class="flex flex-wrap gap-1.5 pl-8 mt-2">
+              ${q.expected_keywords.map(k => `<span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.05);color:rgba(226,232,240,0.5);">${esc(k)}</span>`).join('')}
+            </div>
+          ` : ''}
+          <div class="pl-8 mt-2 mb-2">
+            <textarea
+              data-quiz-index="${i}"
+              rows="3"
+              placeholder="Your answer…"
+              class="w-full text-xs text-slate-200 rounded-lg px-3 py-2 resize-none focus:outline-none"
+              style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;"
+            >${esc(q.developer_answer || '')}</textarea>
+          </div>
+          <div class="pl-8 mt-1">
+            <span class="text-xs ${verdictClass(q.verdict)} px-2 py-0.5 rounded-full font-medium">${esc(q.verdict?.replace(/_/g,' ') || 'pending')}</span>
+          </div>
+        </div>
+      `).join('');
+
+      // ── Submit Quiz button ────────────────────────────────────
+      const submitBtn = document.createElement('button');
+      submitBtn.id = 'quiz-submit-btn';
+      submitBtn.textContent = 'Submit Quiz';
+      submitBtn.className = 'btn-glow text-white font-semibold px-6 py-2.5 rounded-xl text-sm cursor-pointer mt-4 w-full';
+
+      const errMsg = document.createElement('p');
+      errMsg.id = 'quiz-submit-error';
+      errMsg.className = 'hidden text-red-400 text-xs mt-2 font-medium';
+
+      cqEl.insertAdjacentElement('afterend', errMsg);
+      cqEl.insertAdjacentElement('afterend', submitBtn);
+
+      submitBtn.addEventListener('click', async () => {
+        if (!lastAnalyzeData) return;
+
+        // Collect answers in order
+        const textareas = cqEl.querySelectorAll('textarea[data-quiz-index]');
+        const answers = Array.from({ length: textareas.length }, (_, i) => {
+          const ta = cqEl.querySelector(`textarea[data-quiz-index="${i}"]`);
+          return ta ? ta.value : '';
+        });
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting…';
+        errMsg.classList.add('hidden');
+
+        try {
+          const res = await fetch(QUIZ_SCORE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quiz: lastAnalyzeData.coach.quiz, answers }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            console.error('Quiz score request failed', res.status, errData);
+            errMsg.textContent = errData.detail || 'Failed to score quiz. Please try again.';
+            errMsg.classList.remove('hidden');
+            return;
+          }
+
+          const updatedQuiz = await res.json();
+          // Patch lastAnalyzeData so a re-render always has fresh verdicts
+          lastAnalyzeData.coach.quiz = updatedQuiz;
+          lastAnalyzeData.coach.topic_scores = Object.fromEntries(
+            updatedQuiz.map(q => [q.topic, q.verdict])
+          );
+          renderQuiz(updatedQuiz);
+
+        } catch (err) {
+          console.error('Quiz submit error:', err);
+          errMsg.textContent = `Failed to submit quiz: ${err.message}`;
+          errMsg.classList.remove('hidden');
+        } finally {
+          // Re-enable the (possibly re-created) button on failure paths;
+          // on success renderQuiz() already created a fresh button.
+          const btn = document.getElementById('quiz-submit-btn');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Submit Quiz';
+          }
+        }
+      });
+    }
 
       // ── Recommended task ──────────────────────────────────────
       const rt     = coach?.recommended_task;
