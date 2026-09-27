@@ -241,9 +241,10 @@
     .badge-low    { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
 
     /* Verdict badge */
-    .badge-pass   { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
-    .badge-review { background: rgba(251,191,36,0.12);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
-    .badge-fail   { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+    .badge-pass    { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+    .badge-review  { background: rgba(251,191,36,0.12);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+    .badge-fail    { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+    .badge-neutral { background: rgba(148,163,184,0.10); color: #94a3b8; border: 1px solid rgba(148,163,184,0.20); }
 
     /* Section fade-up on render */
     .animate-fade-up { animation: fadeUp 0.45s ease forwards; }
@@ -725,7 +726,7 @@
             >${esc(q.developer_answer || '')}</textarea>
           </div>
           <div class="pl-8 mt-1">
-            <span class="text-xs ${verdictClass(q.verdict)} px-2 py-0.5 rounded-full font-medium">${esc(q.verdict?.replace(/_/g,' ') || 'pending')}</span>
+            <span class="text-xs ${verdictBadgeClass(q.verdict, q.developer_answer)} px-2 py-0.5 rounded-full font-medium">${esc(verdictLabel(q.verdict, q.developer_answer))}</span>
           </div>
         </div>
       `).join('');
@@ -848,9 +849,23 @@
     function verdictClass(v) {
       if (!v) return 'badge-review';
       const m = v.toLowerCase();
-      if (m === 'understood')              return 'badge-pass';
-      if (m === 'needs_review')            return 'badge-review';
+      if (m === 'understood')   return 'badge-pass';
+      if (m === 'needs_review') return 'badge-review';
       return 'badge-review';
+    }
+
+    function verdictBadgeClass(v, developerAnswer) {
+      if (!developerAnswer || !developerAnswer.trim()) return 'badge-neutral';
+      return verdictClass(v);
+    }
+
+    function verdictLabel(v, developerAnswer) {
+      if (!developerAnswer || !developerAnswer.trim()) return 'Not yet answered';
+      if (!v) return 'Needs review';
+      const m = v.toLowerCase();
+      if (m === 'understood')   return 'Understood';
+      if (m === 'needs_review') return 'Needs review';
+      return v.replace(/_/g, ' ');
     }
 
   })();
